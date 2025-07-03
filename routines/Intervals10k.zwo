@@ -1,0 +1,14 @@
+<workout_file>
+  <author>Michael C Hill</author>
+  <name>10k intervals</name>
+  <description/>
+  <sportType>run</sportType>
+  <durationType>distance</durationType>
+  <tags>
+    <tag name="Intervals"/>
+  </tags>
+  <workout>
+    <Warmup Duration="400" PowerLow="0.25" PowerHigh="0.75" pace="0"/>
+    <IntervalsT Repeat="7" OnDuration="800" OffDuration="600" OnPower="1" OffPower="0.86" pace="1"/>
+  </workout>
+</workout_file>
