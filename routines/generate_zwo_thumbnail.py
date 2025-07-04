@@ -3,17 +3,28 @@ import sys
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from pathlib import Path
+import re
 
 def parse_zwo(file_path):
     """
-    Parses a .zwo file and extracts workout segments.
-    Returns a list of segments with their type, duration, and power.
+    Parses a .zwo file and extracts workout segments and routine name.
+    Returns a tuple: (segments_list, routine_name)
     """
     tree = ET.parse(file_path)
     root = tree.getroot()
-    workout = root.find('workout')
-    segments = []
 
+    # Extract routine name from <name> tag
+    routine_name_elem = root.find('name')
+    if routine_name_elem is None or not routine_name_elem.text:
+        routine_name = file_path.stem  # fallback to filename stem
+    else:
+        routine_name = routine_name_elem.text.strip()
+
+    workout = root.find('workout')
+    if workout is None:
+        raise ValueError("No <workout> element found in the file.")
+
+    segments = []
     for elem in workout:
         tag = elem.tag
         attrib = elem.attrib
@@ -44,7 +55,9 @@ def parse_zwo(file_path):
                     'duration': off_duration,
                     'power': off_power
                 })
-    return segments
+
+    return segments, routine_name
+
 
 def parse_json_config(config):
     """
@@ -60,14 +73,13 @@ def parse_json_config(config):
         })
     return segments
 
+
 def plot_workout(segments, output_file):
     """
     Generates a workout chart from segments and saves it as an image.
     Each segment is color-coded based on power intensity.
     """
     current_time = 0
-    times = []
-    powers = []
     colors = []
 
     for seg in segments:
@@ -87,13 +99,9 @@ def plot_workout(segments, output_file):
         else:
             color = 'red'
 
-        # Append start and end times and corresponding powers
-        times.extend([current_time, current_time + duration])
-        powers.extend([power, power])
         colors.append((current_time, current_time + duration, power, color))
         current_time += duration
 
-    # Plot each segment with its corresponding color
     plt.figure(figsize=(10, 4))
     for start, end, power, color in colors:
         plt.fill_between([start, end], 0, power, step='post', color=color, alpha=0.7)
@@ -106,32 +114,51 @@ def plot_workout(segments, output_file):
     plt.savefig(output_file)
     plt.close()
 
+
 def generate_thumbnail(zwo_path):
     """
-    Generates a thumbnail image for a given .zwo file.
+    Generates a thumbnail image for a given .zwo file,
+    saving the output as {routine_name}.png, where routine_name
+    is extracted from the <name> tag inside the XML.
     """
     zwo_file = Path(zwo_path)
     if not zwo_file.is_file() or zwo_file.suffix.lower() != '.zwo':
         print(f"Invalid .zwo file: {zwo_path}")
         return
 
-    thumbnail_path = zwo_file.with_suffix('.png')
+    try:
+        segments, routine_name = parse_zwo(zwo_file)
+    except Exception as e:
+        print(f"Failed to parse {zwo_file.name}: {e}")
+        return
+
+    # Clean routine name for safe filename
+    safe_name = re.sub(r'[^A-Za-z0-9_\- ]+', '', routine_name).strip()
+    if not safe_name:
+        safe_name = zwo_file.stem
+
+    thumbnail_path = Path(f"{safe_name}.png")
+
     if thumbnail_path.exists():
         print(f"Thumbnail already exists: {thumbnail_path}")
         return
 
     try:
-        segments = parse_zwo(zwo_file)
         plot_workout(segments, thumbnail_path)
         print(f"Thumbnail created: {thumbnail_path}")
     except Exception as e:
-        print(f"Error processing {zwo_file.name}: {e}")
+        print(f"Error generating thumbnail for {zwo_file.name}: {e}")
+
 
 def generate_thumbnail_from_config(config, name):
     """
     Generates a thumbnail image from a JSON-like configuration.
     """
-    thumbnail_path = Path(f"{name}.png")
+    safe_name = re.sub(r'[^A-Za-z0-9_\- ]+', '', name).strip()
+    if not safe_name:
+        safe_name = name
+
+    thumbnail_path = Path(f"{safe_name}.png")
     if thumbnail_path.exists():
         print(f"Thumbnail already exists: {thumbnail_path}")
         return
@@ -143,6 +170,7 @@ def generate_thumbnail_from_config(config, name):
     except Exception as e:
         print(f"Error processing {name}: {e}")
 
+
 def process_directory(directory):
     """
     Processes all .zwo files in the given directory.
@@ -150,6 +178,7 @@ def process_directory(directory):
     dir_path = Path(directory)
     for zwo_file in dir_path.glob('*.zwo'):
         generate_thumbnail(zwo_file)
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
