@@ -16,6 +16,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 0e/
         [Folder] 12/
         [Folder] 13/
+        [Folder] 16/
         [Folder] 18/
         [Folder] 1b/
         [Folder] 21/
@@ -29,6 +30,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 40/
         [Folder] 48/
         [Folder] 49/
+        [Folder] 4e/
         [Folder] 53/
         [Folder] 54/
         [Folder] 5b/
@@ -39,19 +41,24 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 69/
         [Folder] 6a/
         [Folder] 6b/
+        [Folder] 6e/
         [Folder] 6f/
         [Folder] 73/
+        [Folder] 78/
         [Folder] 83/
         [Folder] 86/
         [Folder] 90/
         [Folder] 92/
         [Folder] 93/
+        [Folder] 96/
         [Folder] 9d/
         [Folder] a1/
         [Folder] a5/
         [Folder] a9/
         [Folder] ad/
+        [Folder] b5/
         [Folder] b7/
+        [Folder] bd/
         [Folder] c6/
         [Folder] ca/
         [Folder] d1/
@@ -217,6 +224,27 @@ from virtual_competitors import generate_competitors_with_profiles
 import queue
 import time
 from datetime import datetime
+import json
+
+def check_and_update_pbs(workout_data, pb_times, distances_km=[1, 3, 5, 10, 21]):
+    updated = False
+    for target_km in distances_km:
+        best_time = None
+        for i in range(len(workout_data)):
+            for j in range(i+1, len(workout_data)):
+                dist_diff = workout_data[j]["distance"] - workout_data[i]["distance"]
+                if dist_diff >= target_km:
+                    time_diff = (workout_data[j]["timestamp"] - workout_data[i]["timestamp"]).total_seconds() / 60
+                    if best_time is None or time_diff < best_time:
+                        best_time = time_diff
+                    break
+        if best_time and (str(target_km) not in pb_times or best_time < pb_times[str(target_km)]):
+            pb_times[str(target_km)] = round(best_time, 1)
+            updated = True
+    if updated:
+        with open("user_config.json", "w") as f:
+            json.dump({"pb_times_minutes": pb_times}, f, indent=2)
+        print("🎉 New PBs updated:", pb_times)
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
     distance = 0.0
@@ -252,15 +280,14 @@ async def exercise_routine(initial_speed, routine, video_path):
     total_minutes = sum(duration for duration, _ in routine)
     total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
     avg_speed = total_distance_km / (total_minutes / 60)
-
     ghost_runners = generate_competitors_with_profiles(total_minutes, avg_speed)
 
     print("\n--- Ghost Runner Profiles ---")
     for ghost in ghost_runners:
-        print(f"{ghost['name']} | Duration: {ghost['duration_min']:.2f} min | Avg Speed: {ghost['avg_speed']:.2f} km/h | Strategy: {ghost['strategy']}")
+        print(f"{ghost['name']}\n Duration: {ghost['duration_min']:.2f} min\n Avg Speed: {ghost['avg_speed']:.2f} km/h\n Strategy: {ghost['strategy']}")
         for t, s in ghost['speed_profile']:
-            print(f"    t={t:.1f}s -> speed={s:.2f} km/h")
-    print("-----------------------------\n")
+            print(f" t={t:.1f}s -> speed={s:.2f} km/h")
+        print("-----------------------------\n")
 
     start_tcx_file(start_time)
 
@@ -274,13 +301,22 @@ async def exercise_routine(initial_speed, routine, video_path):
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
-
         workout_data.append({
             "timestamp": timestamp,
             "speed": speed,
             "distance": distance,
             "incline": incline
         })
+
+        # Check PBs every 10 samples
+        if len(workout_data) % 10 == 0:
+            try:
+                with open("user_config.json", "r") as f:
+                    config = json.load(f)
+                pb_times = config.get("pb_times_minutes", {})
+                check_and_update_pbs(workout_data, pb_times)
+            except Exception as e:
+                print("PB check failed:", e)
 
         elapsed = (timestamp - start_time).total_seconds()
         user_distance_m = distance * 1000
@@ -289,8 +325,7 @@ async def exercise_routine(initial_speed, routine, video_path):
             ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
             gap = user_distance_m - ghost_distance_m
             ghost_gaps[ghost["name"]] = gap
-            print(f"[Ghost] {ghost['name']} | Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h | Distance: {ghost_distance_m:.1f} m | Gap: {gap:+.1f} m")
-
+            print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
         ghost_gap_queue.put(ghost_gaps)
 
     await treadmill.start_monitoring(callback)
@@ -977,6 +1012,7 @@ def finalize_tcx_file(start_time, end_time, final_distance):
 --- Start of treadmill_control.py ---
 # treadmill_control.py
 import asyncio
+import platform
 from bleak import BleakScanner, BleakClient
 
 ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
@@ -984,10 +1020,14 @@ control_point_uuid = "00002AD9-0000-1000-8000-00805f9b34fb"
 treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
 
 class TreadmillControl:
-    def __init__(self, testing=True):
+    def __init__(self, testing=None):
         self.client = None
-        self.testing = testing
+        if testing is None:
+            self.testing = platform.system() == "Windows"
+        else:
+            self.testing = testing
         self.current_speed = 0.0
+        
 
     async def connect(self, target_name=None, target_address=None):
         if self.testing:
@@ -995,7 +1035,7 @@ class TreadmillControl:
             self.client = "SimulatedClient"  # Mock client to indicate connection
             return
 
-        for attempt in range(3):
+        for attempt in range(6):
             try:
                 print(f"BLE connection attempt {attempt + 1}")
                 devices = await BleakScanner.discover(return_adv=True)

@@ -1,5 +1,6 @@
 # treadmill_control.py
 import asyncio
+import platform
 from bleak import BleakScanner, BleakClient
 
 ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
@@ -7,10 +8,14 @@ control_point_uuid = "00002AD9-0000-1000-8000-00805f9b34fb"
 treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
 
 class TreadmillControl:
-    def __init__(self, testing=True):
+    def __init__(self, testing=None):
         self.client = None
-        self.testing = testing
+        if testing is None:
+            self.testing = platform.system() == "Windows"
+        else:
+            self.testing = testing
         self.current_speed = 0.0
+        
 
     async def connect(self, target_name=None, target_address=None):
         if self.testing:
@@ -18,7 +23,7 @@ class TreadmillControl:
             self.client = "SimulatedClient"  # Mock client to indicate connection
             return
 
-        for attempt in range(3):
+        for attempt in range(6):
             try:
                 print(f"BLE connection attempt {attempt + 1}")
                 devices = await BleakScanner.discover(return_adv=True)
