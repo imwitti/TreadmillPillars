@@ -6,6 +6,27 @@ from virtual_competitors import generate_competitors_with_profiles
 import queue
 import time
 from datetime import datetime
+import json
+
+def check_and_update_pbs(workout_data, pb_times, distances_km=[1, 3, 5, 10, 21]):
+    updated = False
+    for target_km in distances_km:
+        best_time = None
+        for i in range(len(workout_data)):
+            for j in range(i+1, len(workout_data)):
+                dist_diff = workout_data[j]["distance"] - workout_data[i]["distance"]
+                if dist_diff >= target_km:
+                    time_diff = (workout_data[j]["timestamp"] - workout_data[i]["timestamp"]).total_seconds() / 60
+                    if best_time is None or time_diff < best_time:
+                        best_time = time_diff
+                    break
+        if best_time and (str(target_km) not in pb_times or best_time < pb_times[str(target_km)]):
+            pb_times[str(target_km)] = round(best_time, 1)
+            updated = True
+    if updated:
+        with open("user_config.json", "w") as f:
+            json.dump({"pb_times_minutes": pb_times}, f, indent=2)
+        print("🎉 New PBs updated:", pb_times)
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
     distance = 0.0
@@ -41,15 +62,14 @@ async def exercise_routine(initial_speed, routine, video_path):
     total_minutes = sum(duration for duration, _ in routine)
     total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
     avg_speed = total_distance_km / (total_minutes / 60)
-
     ghost_runners = generate_competitors_with_profiles(total_minutes, avg_speed)
 
     print("\n--- Ghost Runner Profiles ---")
     for ghost in ghost_runners:
-        print(f"{ghost['name']} | Duration: {ghost['duration_min']:.2f} min | Avg Speed: {ghost['avg_speed']:.2f} km/h | Strategy: {ghost['strategy']}")
+        print(f"{ghost['name']}\n Duration: {ghost['duration_min']:.2f} min\n Avg Speed: {ghost['avg_speed']:.2f} km/h\n Strategy: {ghost['strategy']}")
         for t, s in ghost['speed_profile']:
-            print(f"    t={t:.1f}s -> speed={s:.2f} km/h")
-    print("-----------------------------\n")
+            print(f" t={t:.1f}s -> speed={s:.2f} km/h")
+        print("-----------------------------\n")
 
     start_tcx_file(start_time)
 
@@ -63,13 +83,22 @@ async def exercise_routine(initial_speed, routine, video_path):
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
-
         workout_data.append({
             "timestamp": timestamp,
             "speed": speed,
             "distance": distance,
             "incline": incline
         })
+
+        # Check PBs every 10 samples
+        if len(workout_data) % 10 == 0:
+            try:
+                with open("user_config.json", "r") as f:
+                    config = json.load(f)
+                pb_times = config.get("pb_times_minutes", {})
+                check_and_update_pbs(workout_data, pb_times)
+            except Exception as e:
+                print("PB check failed:", e)
 
         elapsed = (timestamp - start_time).total_seconds()
         user_distance_m = distance * 1000
@@ -78,8 +107,7 @@ async def exercise_routine(initial_speed, routine, video_path):
             ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
             gap = user_distance_m - ghost_distance_m
             ghost_gaps[ghost["name"]] = gap
-            print(f"[Ghost] {ghost['name']} | Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h | Distance: {ghost_distance_m:.1f} m | Gap: {gap:+.1f} m")
-
+            print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
         ghost_gap_queue.put(ghost_gaps)
 
     await treadmill.start_monitoring(callback)

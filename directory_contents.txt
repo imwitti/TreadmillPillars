@@ -1,0 +1,1395 @@
+Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Documents\GitHub\TreadmillPillars\TreadmillPillars\TreadmillPillars
+
+[Folder] .git/
+    [Folder] hooks/
+    [Folder] info/
+    [Folder] logs/
+        [Folder] refs/
+            [Folder] heads/
+            [Folder] remotes/
+                [Folder] origin/
+    [Folder] objects/
+        [Folder] 01/
+        [Folder] 05/
+        [Folder] 0a/
+        [Folder] 0d/
+        [Folder] 0e/
+        [Folder] 12/
+        [Folder] 13/
+        [Folder] 18/
+        [Folder] 1b/
+        [Folder] 21/
+        [Folder] 24/
+        [Folder] 25/
+        [Folder] 26/
+        [Folder] 27/
+        [Folder] 2a/
+        [Folder] 31/
+        [Folder] 3d/
+        [Folder] 40/
+        [Folder] 48/
+        [Folder] 49/
+        [Folder] 53/
+        [Folder] 54/
+        [Folder] 5b/
+        [Folder] 5f/
+        [Folder] 62/
+        [Folder] 67/
+        [Folder] 68/
+        [Folder] 69/
+        [Folder] 6a/
+        [Folder] 6b/
+        [Folder] 6f/
+        [Folder] 73/
+        [Folder] 83/
+        [Folder] 86/
+        [Folder] 90/
+        [Folder] 92/
+        [Folder] 93/
+        [Folder] 9d/
+        [Folder] a1/
+        [Folder] a5/
+        [Folder] a9/
+        [Folder] ad/
+        [Folder] b7/
+        [Folder] c6/
+        [Folder] ca/
+        [Folder] d1/
+        [Folder] d9/
+        [Folder] df/
+        [Folder] e0/
+        [Folder] e4/
+        [Folder] e9/
+        [Folder] ea/
+        [Folder] ee/
+        [Folder] f9/
+        [Folder] fe/
+        [Folder] info/
+        [Folder] pack/
+    [Folder] refs/
+        [Folder] heads/
+        [Folder] remotes/
+            [Folder] origin/
+        [Folder] tags/
+[Folder] Ancillaries/
+[Folder] Animations/
+[File] RoutineSender.py
+--- Start of RoutineSender.py ---
+import sys
+import asyncio
+import pygame
+import json
+import os
+import subprocess
+from pathlib import Path
+
+from RunRoutine import exercise_routine
+from zwo_parser import load_all_zwo_routines
+from menu_ui import run_selection_ui
+
+# Constants
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+FONT_SIZE = 36
+
+pygame.init()
+screen = pygame.display.set_mode((800, 600), pygame.FULLSCREEN)
+pygame.display.set_caption("Routine Selector")
+font = pygame.font.Font(None, FONT_SIZE)
+
+
+def load_user_config(config_path='user_config.json'):
+    try:
+        with open(config_path, 'r') as file:
+            return json.load(file)
+    except Exception:
+        return {}
+
+
+def load_routines(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    except Exception:
+        return {}
+
+
+def list_videos(video_folder):
+    videos = []
+    for file in os.listdir(video_folder):
+        if file.lower().endswith('.mp4'):
+            name, speed, distance = parse_video_title(file)
+            videos.append((file, name, float(speed), float(distance)))
+    return videos
+
+
+def parse_video_title(title):
+    base = os.path.splitext(title)[0]
+    parts = base.split('_')
+    return parts[0].lower(), parts[1], parts[2]
+
+
+def run_thumbnail_generators():
+    print("Generating thumbnails...")
+    routines_script = Path('Routines') / 'generate_ZWO_thumbnail.py'
+    if routines_script.exists():
+        subprocess.run([sys.executable, str(routines_script.name)], cwd='Routines')
+    else:
+        print("ZWO thumbnail generator not found.")
+
+    videos_script = Path('Videos') / 'video_thumbnails.py'
+    if videos_script.exists():
+        subprocess.run([sys.executable, str(videos_script.name)], cwd='Videos')
+    else:
+        print("Video thumbnail generator not found.")
+
+
+def display_pb_times(screen, font, pb_times):
+    screen.fill(BLACK)
+    y = 60
+    for km in ["1", "3", "5", "10", "21"]:
+        if km in pb_times:
+            txt = font.render(f"PB {km}km: {pb_times[km]:.1f} min", True, WHITE)
+            screen.blit(txt, (60, y))
+            y += 40
+    pygame.display.flip()
+    pygame.time.wait(3000)
+
+
+def show_status(screen, font, message):
+    screen.fill(BLACK)
+    text = font.render(message, True, WHITE)
+    rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+    screen.blit(text, rect)
+    pygame.display.flip()
+
+
+async def main():
+    user_config = load_user_config()
+    pb_times = user_config.get("pb_times_minutes", {})
+    display_pb_times(screen, font, pb_times)
+
+    pb_5k = pb_times.get("5", 25.0)
+    zwo_speed = (5 * 60) / pb_5k  # speed in km/h
+
+    show_status(screen, font, "Generating thumbnails...")
+    run_thumbnail_generators()
+
+    show_status(screen, font, "Loading routines...")
+    json_routines = load_routines('routines.json')
+    zwo_routines = load_all_zwo_routines('routines', zwo_speed)
+    routines = {**json_routines, **zwo_routines}
+
+    show_status(screen, font, "Loading videos...")
+    videos = list_videos('videos')
+    video_data = [(v[0], f"{v[1].capitalize()} ({v[2]} km/h {v[3]}km)") for v in videos]
+
+    routine_name, video_path, selected_speed = run_selection_ui(screen, font, routines, video_data, zwo_speed)
+    if not all([routine_name, video_path, selected_speed]):
+        pygame.quit()
+        return
+
+    show_status(screen, font, "Preparing workout...")
+    selected_routine = routines[routine_name]
+
+    show_status(screen, font, "Starting video and routine...")
+    await exercise_routine(
+        selected_speed,
+        [(d, selected_speed + inc) for d, inc in selected_routine],
+        str(video_path)
+    )
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    finally:
+        pygame.quit()
+--- End of RoutineSender.py ---
+
+[File] RunRoutine.py
+--- Start of RunRoutine.py ---
+import asyncio
+from treadmill_control import TreadmillControl, parse_treadmill_data
+from video_playback import play_video
+from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
+from virtual_competitors import generate_competitors_with_profiles
+import queue
+import time
+from datetime import datetime
+
+def simulate_ghost_distance(speed_profile, elapsed_seconds):
+    distance = 0.0
+    for i in range(len(speed_profile)):
+        t_start, speed = speed_profile[i]
+        t_end = speed_profile[i + 1][0] if i + 1 < len(speed_profile) else float('inf')
+        if elapsed_seconds < t_start:
+            break
+        duration = min(elapsed_seconds, t_end) - t_start
+        distance += (speed * (duration / 3600))  # km/h * hours = km
+        if elapsed_seconds < t_end:
+            break
+    return distance * 1000  # meters
+
+async def exercise_routine(initial_speed, routine, video_path):
+    treadmill = TreadmillControl()
+    await treadmill.connect()
+    await treadmill.request_control()
+    await asyncio.sleep(10)
+    await treadmill.set_incline(1.0)
+
+    speed_ratio_queue = queue.Queue()
+    speed_ratio_queue.put(1.0)
+    speed_queue = queue.Queue()
+    speed_queue.put(initial_speed)
+    distance_queue = queue.Queue()
+    distance_queue.put(0.0)
+    ghost_gap_queue = queue.Queue()
+
+    start_time = datetime.utcnow()
+    workout_data = []
+
+    total_minutes = sum(duration for duration, _ in routine)
+    total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
+    avg_speed = total_distance_km / (total_minutes / 60)
+
+    ghost_runners = generate_competitors_with_profiles(total_minutes, avg_speed)
+
+    print("\n--- Ghost Runner Profiles ---")
+    for ghost in ghost_runners:
+        print(f"{ghost['name']} | Duration: {ghost['duration_min']:.2f} min | Avg Speed: {ghost['avg_speed']:.2f} km/h | Strategy: {ghost['strategy']}")
+        for t, s in ghost['speed_profile']:
+            print(f"    t={t:.1f}s -> speed={s:.2f} km/h")
+    print("-----------------------------\n")
+
+    start_tcx_file(start_time)
+
+    def callback(sender, data):
+        speed, distance, incline = parse_treadmill_data(data)
+        print(f"Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %")
+        speed_ratio = speed / initial_speed if initial_speed > 0 else 1.0
+        speed_ratio_queue.put(speed_ratio)
+        speed_queue.put(speed)
+        distance_queue.put(distance)
+
+        timestamp = datetime.utcnow()
+        append_tcx_trackpoint(timestamp, speed, distance, incline)
+
+        workout_data.append({
+            "timestamp": timestamp,
+            "speed": speed,
+            "distance": distance,
+            "incline": incline
+        })
+
+        elapsed = (timestamp - start_time).total_seconds()
+        user_distance_m = distance * 1000
+        ghost_gaps = {}
+        for ghost in ghost_runners:
+            ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
+            gap = user_distance_m - ghost_distance_m
+            ghost_gaps[ghost["name"]] = gap
+            print(f"[Ghost] {ghost['name']} | Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h | Distance: {ghost_distance_m:.1f} m | Gap: {gap:+.1f} m")
+
+        ghost_gap_queue.put(ghost_gaps)
+
+    await treadmill.start_monitoring(callback)
+
+    video_task = asyncio.create_task(
+        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue)
+    )
+
+    for duration, speed_increment in routine:
+        await treadmill.set_speed(speed_increment)
+        await asyncio.sleep(duration * 60)
+
+    await treadmill.stop_monitoring()
+    await treadmill.disconnect()
+    await video_task
+
+    end_time = datetime.utcnow()
+    final_distance = workout_data[-1]["distance"] if workout_data else 0.0
+    finalize_tcx_file(start_time, end_time, final_distance)
+--- End of RunRoutine.py ---
+
+[Folder] TCX/
+[Folder] __pycache__/
+[File] ghost_runner_hud.py
+--- Start of ghost_runner_hud.py ---
+import cv2
+import numpy as np
+
+class GhostRunnerHUD:
+    def __init__(self, sprite_path='Animations/Runners.png', target_width=50, animation_speed=5):
+        self.sprite_path = sprite_path
+        self.target_width = target_width
+        self.animation_speed = animation_speed  # frames to wait before advancing animation frame
+
+        self.frames = []
+        self.frame_idx = 0
+        self.frame_counter = 0
+
+        self._load_and_process_sprites()
+
+    def _convert_black_on_white_to_white_on_transparent(self, frame):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        inverted = cv2.bitwise_not(gray)
+        _, alpha = cv2.threshold(inverted, 30, 255, cv2.THRESH_BINARY)
+        b = np.ones_like(alpha) * 255
+        g = np.ones_like(alpha) * 255
+        r = np.ones_like(alpha) * 255
+        rgba = cv2.merge([b, g, r, alpha])
+        return rgba
+
+    def _resize_sprite(self, frame, target_width=None):
+        if target_width is None:
+            target_width = self.target_width
+        h, w = frame.shape[:2]
+        scale = target_width / w
+        new_size = (target_width, int(h * scale))
+        return cv2.resize(frame, new_size, interpolation=cv2.INTER_AREA)
+
+    def _tint_sprite_red(self, sprite):
+        tinted = sprite.copy()
+        if sprite.shape[2] == 4:
+            b, g, r, a = cv2.split(tinted)
+            r = np.clip(r.astype(np.int32) + 100, 0, 255).astype(np.uint8)
+            g = np.clip(g.astype(np.int32) * 0.3, 0, 255).astype(np.uint8)
+            b = np.clip(b.astype(np.int32) * 0.3, 0, 255).astype(np.uint8)
+            return cv2.merge([b, g, r, a])
+        return tinted
+
+    def _overlay_sprite(self, background, sprite, x, y):
+        h, w = sprite.shape[:2]
+        if y < 0 or y + h > background.shape[0] or x < 0 or x + w > background.shape[1]:
+            return
+
+        if sprite.shape[2] == 4:
+            alpha_s = sprite[:, :, 3] / 255.0
+            alpha_s = alpha_s[..., None]
+            alpha_b = 1.0 - alpha_s
+            for c in range(3):
+                background[y:y+h, x:x+w, c] = (alpha_s[:, :, 0] * sprite[:, :, c] +
+                                               alpha_b[:, :, 0] * background[y:y+h, x:x+w, c])
+        else:
+            background[y:y+h, x:x+w] = sprite
+
+    def _load_and_process_sprites(self):
+        img = cv2.imread(self.sprite_path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise FileNotFoundError(f"Could not load sprite image '{self.sprite_path}'")
+
+        h, w = img.shape[:2]
+        half_h, half_w = h // 2, w // 2
+
+        center_crop_width = 205
+        crop_x_start = half_w // 2 - center_crop_width // 2
+        crop_x_end = crop_x_start + center_crop_width
+
+        quadrants = [
+            img[0:half_h, crop_x_start:crop_x_end],
+            img[0:half_h, half_w + crop_x_start:half_w + crop_x_end],
+            img[half_h:h, crop_x_start:crop_x_end],
+            img[half_h:h, half_w + crop_x_start:half_w + crop_x_end]
+        ]
+
+        processed = []
+        for f in quadrants:
+            rgba = self._convert_black_on_white_to_white_on_transparent(f)
+            resized = self._resize_sprite(rgba)
+            processed.append(resized)
+
+        self.frames = processed
+
+    def draw_ghost_runners(self, frame, ghost_gaps):
+        #print("Received ghost_gaps:")
+        if not isinstance(ghost_gaps, dict):
+            print("  ghost_gaps is not a dictionary or is None")
+            return
+
+        selected_ghosts = sorted(ghost_gaps.items(), reverse=True)[:3]
+
+        # Update animation frame counter
+        self.frame_counter += 1
+        if self.frame_counter % self.animation_speed == 0:
+            self.frame_idx = (self.frame_idx + 1) % len(self.frames)
+
+        base_sprite = self.frames[self.frame_idx]
+        sprite_h, sprite_w = base_sprite.shape[:2]
+
+        num_ghost_lines = len(selected_ghosts)
+        top_ghost_text_y = frame.shape[0] - 30 - (num_ghost_lines - 1) * 25
+        base_y = top_ghost_text_y - sprite_h - 10
+        start_x = frame.shape[1] - (sprite_w * 3) - (5 * 2) - 20
+
+        for i, (name, gap) in enumerate(selected_ghosts):
+            try:
+                gap = float(gap)
+                if gap > 50 or gap < -400:
+                    continue  # skip ghosts too far behind or ahead
+
+                ratio = max(0.0, min(1.0, 1 + (gap / 400.0)))
+                width = max(5, int(self.target_width * ratio))
+                sprite = self._resize_sprite(base_sprite, target_width=width)
+
+                if gap > 0:
+                    sprite = self._tint_sprite_red(sprite)
+
+                x = start_x + i * (sprite.shape[1] + 5)
+                self._overlay_sprite(frame, sprite, x, base_y)
+            except Exception as e:
+                print(f"Error processing ghost '{name}': {e}")
+--- End of ghost_runner_hud.py ---
+
+[File] list_directory.py
+--- Start of list_directory.py ---
+import os
+
+# Define the file extensions to include
+INCLUDED_EXTENSIONS = {'.json', '.py', '.css', '.js', '.html'}
+
+def write_directory_contents(output_file, current_path, indent_level=0):
+    indent = '    ' * indent_level
+    try:
+        entries = sorted(os.listdir(current_path))
+    except PermissionError:
+        output_file.write(f"{indent}[Permission Denied]: {current_path}\n")
+        return
+
+    for entry in entries:
+        full_path = os.path.join(current_path, entry)
+        if os.path.isdir(full_path):
+            output_file.write(f"{indent}[Folder] {entry}/\n")
+            write_directory_contents(output_file, full_path, indent_level + 1)
+        elif os.path.isfile(full_path):
+            _, ext = os.path.splitext(entry)
+            if ext.lower() in INCLUDED_EXTENSIONS:
+                output_file.write(f"{indent}[File] {entry}\n")
+                try:
+                    with open(full_path, 'r', encoding='utf-8', errors='replace') as file:
+                        content = file.read()
+                        output_file.write(f"{indent}--- Start of {entry} ---\n")
+                        for line in content.splitlines():
+                            output_file.write(f"{indent}{line}\n")
+                        output_file.write(f"{indent}--- End of {entry} ---\n\n")
+                except Exception as e:
+                    output_file.write(f"{indent}[Error reading file]: {e}\n")
+
+def main():
+    output_filename = 'directory_contents.txt'
+    with open(output_filename, 'w', encoding='utf-8') as output_file:
+        start_path = os.getcwd()
+        output_file.write(f"Directory structure and file contents of: {start_path}\n\n")
+        write_directory_contents(output_file, start_path)
+
+if __name__ == "__main__":
+    main()
+--- End of list_directory.py ---
+
+[File] menu_ui.py
+--- Start of menu_ui.py ---
+import pygame
+from pathlib import Path
+import os
+
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+HIGHLIGHT = (50, 200, 255)
+LIGHT_HIGHLIGHT = (80, 80, 120)
+FONT_SIZE = 36
+TITLE_FONT_SIZE = 18
+THUMBNAIL_SIZE = (120, 90)
+ITEM_SPACING = 150
+CAROUSEL_Y_POSITIONS = [120, 260, 400]
+START_BUTTON_Y = 520
+
+def load_thumbnail(path, size=THUMBNAIL_SIZE):
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        img = pygame.image.load(str(p)).convert_alpha()
+        return pygame.transform.smoothscale(img, size)
+    except Exception:
+        return None
+
+def run_selection_ui(screen, font, routines, videos, start_speed=8.5):
+    title_font = pygame.font.Font(None, TITLE_FONT_SIZE)
+
+    routine_names = list(routines.keys())
+    routine_thumbs = [load_thumbnail(f"Routines/{name}.png") for name in routine_names]
+
+    video_files = [v[0] for v in videos]
+    video_labels = [v[1] for v in videos]
+    video_thumbs = [load_thumbnail(f"Videos/{Path(v[0]).with_suffix('.png').name}") for v in videos]
+
+    speeds = [round(x * 0.1, 1) for x in range(10, 201)]
+    start_speed = max(1.0, min(start_speed, 20.0))
+    speed_idx = min(range(len(speeds)), key=lambda i: abs(speeds[i] - start_speed))
+
+    selections = [0, 0, speed_idx]  # routine, video, speed
+    offsets = [0, 0, max(0, speed_idx - 2)]
+    focused = 0  # 0=routine, 1=video, 2=speed, 3=start
+
+    clock = pygame.time.Clock()
+    running = True
+
+    while running:
+        screen.fill(BLACK)
+        screen_width = screen.get_width()
+
+        for carousel_i in range(3):
+            y = CAROUSEL_Y_POSITIONS[carousel_i]
+            selected_idx = selections[carousel_i]
+            offset = offsets[carousel_i]
+
+            if carousel_i == 0:
+                items = routine_names
+                thumbs = routine_thumbs
+                titles = routine_names
+            elif carousel_i == 1:
+                items = video_labels
+                thumbs = video_thumbs
+                titles = video_labels
+            else:
+                items = [f"{s:.1f} km/h" for s in speeds]
+                thumbs = [None] * len(items)
+                titles = items
+
+            visible_range = range(offset, min(offset + 5, len(items)))
+            total_width = (len(visible_range) - 1) * ITEM_SPACING
+            start_x = (screen_width - total_width) // 2
+
+            for i, idx in enumerate(visible_range):
+                x = start_x + i * ITEM_SPACING
+                is_selected = (idx == selected_idx)
+                is_focused = (carousel_i == focused)
+
+                label_text = titles[idx]
+                label_surf = title_font.render(label_text, True, WHITE)
+                label_rect = label_surf.get_rect(center=(x, y + THUMBNAIL_SIZE[1] // 2 + 20))
+
+                if is_selected:
+                    if carousel_i == 2:
+                        # Speed background highlight behind label
+                        bg_color = HIGHLIGHT if is_focused else LIGHT_HIGHLIGHT
+                        padding = 10
+                        bg_rect = pygame.Rect(
+                            label_rect.left - padding,
+                            label_rect.top - padding,
+                            label_rect.width + 2 * padding,
+                            label_rect.height + 2 * padding
+                        )
+                        pygame.draw.rect(screen, bg_color, bg_rect)
+                    else:
+                        # Routine/Video background highlight behind thumb + label
+                        thumb_h = THUMBNAIL_SIZE[1]
+                        full_rect = pygame.Rect(
+                            x - THUMBNAIL_SIZE[0] // 2 - 10,
+                            y - thumb_h // 2 - 10,
+                            THUMBNAIL_SIZE[0] + 20,
+                            thumb_h + 20 + 30  # padding + label space
+                        )
+                        bg_color = HIGHLIGHT if is_focused else LIGHT_HIGHLIGHT
+                        pygame.draw.rect(screen, bg_color, full_rect)
+
+                if carousel_i != 2:
+                    if thumbs[idx]:
+                        thumb_rect = thumbs[idx].get_rect(center=(x, y))
+                        screen.blit(thumbs[idx], thumb_rect)
+                    else:
+                        rect = pygame.Rect(x - THUMBNAIL_SIZE[0] // 2, y - THUMBNAIL_SIZE[1] // 2,
+                                           THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1])
+                        pygame.draw.rect(screen, WHITE, rect, 2)
+
+                screen.blit(label_surf, label_rect)
+
+        # Draw START button
+        start_rect = pygame.Rect(screen_width // 2 - 100, START_BUTTON_Y, 200, 50)
+        if focused == 3:
+            pygame.draw.rect(screen, HIGHLIGHT, start_rect)
+            start_text = font.render("START", True, BLACK)
+        else:
+            pygame.draw.rect(screen, WHITE, start_rect, 2)
+            start_text = font.render("START", True, WHITE)
+        start_text_rect = start_text.get_rect(center=start_rect.center)
+        screen.blit(start_text, start_text_rect)
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return None, None, None
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    return None, None, None
+                elif event.key == pygame.K_DOWN:
+                    focused = (focused + 1) % 4
+                elif event.key == pygame.K_UP:
+                    focused = (focused - 1) % 4
+                elif event.key == pygame.K_RIGHT:
+                    if focused < 3:
+                        max_idx = (len(routine_names) - 1 if focused == 0 else
+                                   len(video_labels) - 1 if focused == 1 else
+                                   len(speeds) - 1)
+                        if selections[focused] < max_idx:
+                            selections[focused] += 1
+                            if selections[focused] >= offsets[focused] + 5:
+                                offsets[focused] += 1
+                elif event.key == pygame.K_LEFT:
+                    if focused < 3 and selections[focused] > 0:
+                        selections[focused] -= 1
+                        if selections[focused] < offsets[focused]:
+                            offsets[focused] = max(0, offsets[focused] - 1)
+                elif event.key == pygame.K_RETURN:
+                    if focused == 3:
+                        routine = routine_names[selections[0]]
+                        video_file = video_files[selections[1]]
+                        speed = speeds[selections[2]]
+                        return routine, os.path.join('videos', video_file), speed
+
+        clock.tick(30)
+--- End of menu_ui.py ---
+
+[Folder] music/
+[Folder] routines/
+    [File] generate_zwo_thumbnail.py
+    --- Start of generate_zwo_thumbnail.py ---
+    import os
+    import sys
+    import xml.etree.ElementTree as ET
+    import matplotlib.pyplot as plt
+    from pathlib import Path
+    import re
+    
+    def parse_zwo(file_path):
+        """
+        Parses a .zwo file and extracts workout segments and routine name.
+        Returns a tuple: (segments_list, routine_name)
+        """
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+    
+        # Extract routine name from <name> tag
+        routine_name_elem = root.find('name')
+        if routine_name_elem is None or not routine_name_elem.text:
+            routine_name = file_path.stem  # fallback to filename stem
+        else:
+            routine_name = routine_name_elem.text.strip()
+    
+        workout = root.find('workout')
+        if workout is None:
+            raise ValueError("No <workout> element found in the file.")
+    
+        segments = []
+        for elem in workout:
+            tag = elem.tag
+            attrib = elem.attrib
+            if tag in ['Warmup', 'Cooldown']:
+                duration = float(attrib.get('Duration', 0))
+                power_low = float(attrib.get('PowerLow', 0))
+                power_high = float(attrib.get('PowerHigh', 0))
+                segments.append({
+                    'type': tag,
+                    'duration': duration,
+                    'power_low': power_low,
+                    'power_high': power_high
+                })
+            elif tag == 'IntervalsT':
+                repeat = int(attrib.get('Repeat', 1))
+                on_duration = float(attrib.get('OnDuration', 0))
+                off_duration = float(attrib.get('OffDuration', 0))
+                on_power = float(attrib.get('OnPower', 0))
+                off_power = float(attrib.get('OffPower', 0))
+                for _ in range(repeat):
+                    segments.append({
+                        'type': 'Interval On',
+                        'duration': on_duration,
+                        'power': on_power
+                    })
+                    segments.append({
+                        'type': 'Interval Off',
+                        'duration': off_duration,
+                        'power': off_power
+                    })
+    
+        return segments, routine_name
+    
+    
+    def parse_json_config(config):
+        """
+        Parses a JSON-like configuration and extracts workout segments.
+        Returns a list of segments with their type, duration, and power.
+        """
+        segments = []
+        for duration, power in config:
+            segments.append({
+                'type': 'Interval',
+                'duration': duration * 60,  # Convert minutes to seconds
+                'power': power
+            })
+        return segments
+    
+    
+    def plot_workout(segments, output_file):
+        """
+        Generates a workout chart from segments and saves it as an image.
+        Each segment is color-coded based on power intensity.
+        """
+        current_time = 0
+        colors = []
+    
+        for seg in segments:
+            duration = seg['duration']
+            if seg['type'] in ['Warmup', 'Cooldown']:
+                power = (seg['power_low'] + seg['power_high']) / 2
+            else:
+                power = seg['power']
+    
+            # Determine color based on power
+            if power < 0.9:
+                color = 'green'
+            elif power < 1.0:
+                color = 'yellow'
+            elif power < 1.1:
+                color = 'orange'
+            else:
+                color = 'red'
+    
+            colors.append((current_time, current_time + duration, power, color))
+            current_time += duration
+    
+        plt.figure(figsize=(10, 4))
+        for start, end, power, color in colors:
+            plt.fill_between([start, end], 0, power, step='post', color=color, alpha=0.7)
+    
+        plt.xlabel('Time (s)')
+        plt.ylabel('Power (FTP)')
+        plt.title('Workout Chart')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(output_file)
+        plt.close()
+    
+    
+    def generate_thumbnail(zwo_path):
+        """
+        Generates a thumbnail image for a given .zwo file,
+        saving the output as {routine_name}.png, where routine_name
+        is extracted from the <name> tag inside the XML.
+        """
+        zwo_file = Path(zwo_path)
+        if not zwo_file.is_file() or zwo_file.suffix.lower() != '.zwo':
+            print(f"Invalid .zwo file: {zwo_path}")
+            return
+    
+        try:
+            segments, routine_name = parse_zwo(zwo_file)
+        except Exception as e:
+            print(f"Failed to parse {zwo_file.name}: {e}")
+            return
+    
+        # Clean routine name for safe filename
+        safe_name = re.sub(r'[^A-Za-z0-9_\- ]+', '', routine_name).strip()
+        if not safe_name:
+            safe_name = zwo_file.stem
+    
+        thumbnail_path = Path(f"{safe_name}.png")
+    
+        if thumbnail_path.exists():
+            print(f"Thumbnail already exists: {thumbnail_path}")
+            return
+    
+        try:
+            plot_workout(segments, thumbnail_path)
+            print(f"Thumbnail created: {thumbnail_path}")
+        except Exception as e:
+            print(f"Error generating thumbnail for {zwo_file.name}: {e}")
+    
+    
+    def generate_thumbnail_from_config(config, name):
+        """
+        Generates a thumbnail image from a JSON-like configuration.
+        """
+        safe_name = re.sub(r'[^A-Za-z0-9_\- ]+', '', name).strip()
+        if not safe_name:
+            safe_name = name
+    
+        thumbnail_path = Path(f"{safe_name}.png")
+        if thumbnail_path.exists():
+            print(f"Thumbnail already exists: {thumbnail_path}")
+            return
+    
+        try:
+            segments = parse_json_config(config)
+            plot_workout(segments, thumbnail_path)
+            print(f"Thumbnail created: {thumbnail_path}")
+        except Exception as e:
+            print(f"Error processing {name}: {e}")
+    
+    
+    def process_directory(directory):
+        """
+        Processes all .zwo files in the given directory.
+        """
+        dir_path = Path(directory)
+        for zwo_file in dir_path.glob('*.zwo'):
+            generate_thumbnail(zwo_file)
+    
+    
+    if __name__ == "__main__":
+        if len(sys.argv) > 1:
+            # Called with a specific .zwo file
+            generate_thumbnail(sys.argv[1])
+        else:
+            # No arguments; process all .zwo files in current directory
+            process_directory('.')
+    
+            # Example JSON-like configurations
+            workout_configs = {
+                "p1": [
+                    [5, 0],
+                    [5, 0.8],
+                    [4, 0],
+                    [4, 1.0],
+                    [3, 0],
+                    [3, 1.5],
+                    [2, 0],
+                    [2, 2.0],
+                    [1, 0],
+                    [1, 2.5]
+                ],
+                "long_pillars": [
+                    [6, 0],
+                    [6, 0.5],
+                    [5, 0],
+                    [5, 1.0],
+                    [4, 0],
+                    [4, 1.5],
+                    [3, 0],
+                    [3, 2.0],
+                    [2, 0],
+                    [2, 2.5],
+                    [1, 0],
+                    [2, 3.0]
+                ]
+            }
+    
+            for name, config in workout_configs.items():
+                generate_thumbnail_from_config(config, name)
+    --- End of generate_zwo_thumbnail.py ---
+
+[File] routines.json
+--- Start of routines.json ---
+{
+    "p1": [
+        [5, 0],
+        [5, 0.5],
+        [4, 0],
+        [4, 1.0],
+        [3, 0],
+        [3, 1.5],
+        [2, 0],
+        [2, 2.0],
+        [1, 0],
+        [1, 2.5]
+    ],
+    "long_pillars": [
+        [6, 0],
+        [6, 0.5],
+        [5, 0],
+        [5, 1.0],
+        [4, 0],
+        [4, 1.5],
+        [3, 0],
+        [3, 2.0],
+        [2, 0],
+        [2, 2.5],
+        [1, 0],
+        [2, 3]
+    ]
+}
+--- End of routines.json ---
+
+[File] tcx_incremental.py
+--- Start of tcx_incremental.py ---
+import os
+import xml.etree.ElementTree as ET
+from datetime import datetime
+
+# Global variables to hold the TCX tree and file path
+tcx_tree = None
+tcx_root = None
+tcx_track = None
+tcx_filename = None
+
+def start_tcx_file(start_time):
+    global tcx_tree, tcx_root, tcx_track, tcx_filename
+
+    tcx_root = ET.Element("TrainingCenterDatabase", xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2")
+    activities = ET.SubElement(tcx_root, "Activities")
+    activity = ET.SubElement(activities, "Activity", Sport="Running")
+    ET.SubElement(activity, "Id").text = start_time.isoformat()
+
+    lap = ET.SubElement(activity, "Lap", StartTime=start_time.isoformat())
+    ET.SubElement(lap, "TotalTimeSeconds").text = "0"
+    ET.SubElement(lap, "DistanceMeters").text = "0"
+    ET.SubElement(lap, "Calories").text = "0"
+    ET.SubElement(lap, "Intensity").text = "Active"
+    ET.SubElement(lap, "TriggerMethod").text = "Manual"
+
+    tcx_track = ET.SubElement(lap, "Track")
+    tcx_tree = ET.ElementTree(tcx_root)
+
+    os.makedirs("TCX", exist_ok=True)
+    tcx_filename = f"TCX/workout_{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.tcx"
+    tcx_tree.write(tcx_filename, encoding="utf-8", xml_declaration=True)
+
+def append_tcx_trackpoint(timestamp, speed, distance, incline):
+    global tcx_tree, tcx_track, tcx_filename
+
+    trackpoint = ET.SubElement(tcx_track, "Trackpoint")
+    ET.SubElement(trackpoint, "Time").text = timestamp.isoformat()
+    ET.SubElement(trackpoint, "DistanceMeters").text = str(distance * 1000)
+
+    extensions = ET.SubElement(trackpoint, "Extensions")
+    tpx = ET.SubElement(extensions, "TPX", xmlns="http://www.garmin.com/xmlschemas/ActivityExtension/v2")
+    ET.SubElement(tpx, "Speed").text = str(speed / 3.6)
+
+    # Save the updated tree incrementally
+    tcx_tree.write(tcx_filename, encoding="utf-8", xml_declaration=True)
+
+def finalize_tcx_file(start_time, end_time, final_distance):
+    global tcx_tree, tcx_root, tcx_filename
+
+    lap = tcx_root.find(".//{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Lap")
+    if lap is not None:
+        lap.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}TotalTimeSeconds").text = str((end_time - start_time).total_seconds())
+        lap.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}DistanceMeters").text = str(final_distance * 1000)
+
+    tcx_tree.write(tcx_filename, encoding="utf-8", xml_declaration=True)
+    print(f"Workout data saved incrementally to {tcx_filename}")
+--- End of tcx_incremental.py ---
+
+[File] treadmill_control.py
+--- Start of treadmill_control.py ---
+# treadmill_control.py
+import asyncio
+from bleak import BleakScanner, BleakClient
+
+ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
+control_point_uuid = "00002AD9-0000-1000-8000-00805f9b34fb"
+treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
+
+class TreadmillControl:
+    def __init__(self, testing=True):
+        self.client = None
+        self.testing = testing
+        self.current_speed = 0.0
+
+    async def connect(self, target_name=None, target_address=None):
+        if self.testing:
+            print("Simulated connection to treadmill.")
+            self.client = "SimulatedClient"  # Mock client to indicate connection
+            return
+
+        for attempt in range(3):
+            try:
+                print(f"BLE connection attempt {attempt + 1}")
+                devices = await BleakScanner.discover(return_adv=True)
+
+                treadmill = None
+                for device, adv_data in devices.values():
+                    print(f"- {device.name or 'Unknown'} ({device.address})")
+
+                    # Priority 1: FTMS service
+                    if ftms_service_uuid in adv_data.service_uuids:
+                        treadmill = device
+                        print("Found FTMS treadmill.")
+                        break
+
+                    # Priority 2: Match by name
+                    if target_name and device.name == target_name:
+                        treadmill = device
+                        print(f"Matched treadmill by name: {target_name}")
+                        break
+
+                    # Priority 3: Match by MAC address
+                    if target_address and device.address.lower() == target_address.lower():
+                        treadmill = device
+                        print(f"Matched treadmill by address: {target_address}")
+                        break
+
+                if treadmill:
+                    self.client = BleakClient(treadmill.address)
+                    await self.client.connect()
+                    print(f"Connected to {treadmill.name or 'Unknown'} ({treadmill.address})")
+                    return
+
+                raise Exception("Treadmill not found.")
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                await asyncio.sleep(2)
+
+        raise Exception("Failed to connect after 3 attempts.")
+
+
+    async def disconnect(self):
+        if self.testing:
+            print("Simulated disconnection from treadmill.")
+            self.client = None
+            return
+        if self.client:
+            await self.client.disconnect()
+
+    async def request_control(self):
+        if self.testing:
+            print("Simulated control request.")
+            return
+        await self.client.write_gatt_char(control_point_uuid, bytearray([0x00]))
+        await self.wait_for_response()
+
+    async def set_speed(self, speed_kmh):
+        self.current_speed = speed_kmh
+        if self.testing:
+            speed_mph = round(speed_kmh / 1.59, 2)
+            print(f"Simulated setting speed to {speed_kmh:.2f} km/h ({speed_mph:.2f} mph)")
+            return
+        speed_mph = round(speed_kmh / 1.59, 2)
+        speed_value = int(speed_mph * 100).to_bytes(2, byteorder='little')
+        await self.client.write_gatt_char(control_point_uuid, bytearray([0x02]) + speed_value)
+        print(f"Set speed to {speed_kmh:.2f} km/h ({speed_mph:.2f} mph)")
+        await self.wait_for_response()
+
+    async def set_incline(self, incline):
+        if self.testing:
+            print(f"Simulated setting incline to {incline:.1f} %")
+            return
+        incline_value = int(incline * 10).to_bytes(2, byteorder='little', signed=True)
+        await self.client.write_gatt_char(control_point_uuid, bytearray([0x03]) + incline_value)
+        print(f"Set incline to {incline:.1f} %")
+        await self.wait_for_response()
+
+    async def wait_for_response(self):
+        if self.testing:
+            print("Simulated waiting for response.")
+            return
+
+        def handle_response(sender, data):
+            op_code = data[0]
+            request_op_code = data[1]
+            result_code = data[2]
+            if result_code == 0x01:
+                print(f"Operation {request_op_code} succeeded")
+            else:
+                print(f"Operation {request_op_code} failed with result code {result_code}")
+
+        await self.client.start_notify(control_point_uuid, handle_response)
+        await asyncio.sleep(1)  # Wait for the response
+        await self.client.stop_notify(control_point_uuid)
+
+    async def start_monitoring(self, callback):
+        if self.testing:
+            print("Simulated start monitoring.")
+            # Simulate data
+            async def simulate_data():
+                while True:
+                    speed_value = int(self.current_speed * 100).to_bytes(2, byteorder='little')
+                    data = bytearray([0x08, 0x00]) + speed_value + bytearray([0x00, 0x00, 0x00, 0x00, 0x0A, 0x00])
+                    callback(None, data)
+                    await asyncio.sleep(1)
+            asyncio.create_task(simulate_data())
+            return
+        if self.client:
+            await self.client.start_notify(treadmill_data_uuid, callback)
+
+    async def stop_monitoring(self):
+        if self.testing:
+            print("Simulated stop monitoring.")
+            return
+        if self.client:
+            await self.client.stop_notify(treadmill_data_uuid)
+
+    async def increase_speed(self):
+        await self.set_speed(self.current_speed + 0.5)
+
+    async def decrease_speed(self):
+        await self.set_speed(self.current_speed - 0.5)
+
+def parse_treadmill_data(data):
+    flags = data[0]
+    speed = int.from_bytes(data[2:4], byteorder='little') / 100.0
+    distance = int.from_bytes(data[4:7], byteorder='little') /1000
+    incline = None
+    if flags & 0x08:  # Check if Inclination and Ramp Angle Setting Present bit is set
+        incline = int.from_bytes(data[7:9], byteorder='little', signed=True) / 10.0
+    return speed, distance, incline
+--- End of treadmill_control.py ---
+
+[File] user_config.json
+--- Start of user_config.json ---
+{
+  "pb_times_minutes": {
+    "1": 5.0,
+    "3": 20.0,
+    "5": 35.0,
+    "10": 115.0,
+    "21": 140.0
+  }
+}
+--- End of user_config.json ---
+
+[File] video_playback.py
+--- Start of video_playback.py ---
+import cv2
+import asyncio
+import time
+from ghost_runner_hud import GhostRunnerHUD
+
+async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, start_time, ghost_gap_queue):
+    cap = cv2.VideoCapture(video_path)
+    last_known_speed = 0.0
+    last_known_distance = 0.0
+    last_ghost_gaps = {}
+
+    speed_ratio = 1.0  # default speed ratio
+
+    ghost_runner_hud = GhostRunnerHUD()
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if not speed_ratio_queue.empty():
+            speed_ratio = speed_ratio_queue.get()
+        if not speed_queue.empty():
+            last_known_speed = speed_queue.get()
+        if not distance_queue.empty():
+            last_known_distance = distance_queue.get()
+        if not ghost_gap_queue.empty():
+            last_ghost_gaps = ghost_gap_queue.get()
+
+        # HUD: Speed (top-left)
+        hud_speed_text = f"{last_known_speed:.1f} km/h"
+        cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # HUD: Distance (top-right)
+        hud_distance_text = f"{last_known_distance:.0f} km"
+        (text_width, text_height), _ = cv2.getTextSize(hud_distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+        x_position = frame.shape[1] - text_width - 10
+        y_position = text_height + 10
+        cv2.putText(frame, hud_distance_text, (x_position, y_position), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # HUD: Time (bottom-left)
+        elapsed_time = time.time() - start_time
+        hud_time_text = f"Time: {int(elapsed_time // 60)}:{int(elapsed_time % 60):02d}"
+        cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # HUD: Ghost Gaps (bottom-right)
+        if last_ghost_gaps:
+            y_offset = frame.shape[0] - 30
+            for name, gap in sorted(last_ghost_gaps.items(), reverse=True):
+                gap_text = f"{name}: {'+' if gap >= 0 else ''}{gap:.1f} m"
+                text_size = cv2.getTextSize(gap_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+                x_pos = frame.shape[1] - text_size[0] - 10
+                cv2.putText(frame, gap_text, (x_pos, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                y_offset -= 25
+
+            # Draw ghost runner sprites above ghost gap text
+            ghost_runner_hud.draw_ghost_runners(frame, last_ghost_gaps)
+
+        cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty("Video", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.imshow("Video", frame)
+
+        if cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF == ord('q'):
+            break
+
+        await asyncio.sleep(0)
+
+    cap.release()
+    cv2.destroyAllWindows()
+--- End of video_playback.py ---
+
+[Folder] videos/
+    [File] video_thumbnails.py
+    --- Start of video_thumbnails.py ---
+    import cv2
+    from pathlib import Path
+    
+    def generate_video_thumbnail(video_path, timestamp=1.0):
+        """
+        Generates a thumbnail image for a given .mp4 video file at a specified timestamp.
+        """
+        video_file = Path(video_path)
+        if not video_file.is_file() or video_file.suffix.lower() != '.mp4':
+            print(f"Invalid .mp4 file: {video_path}")
+            return
+    
+        thumbnail_path = video_file.with_suffix('.png')
+        if thumbnail_path.exists():
+            print(f"Thumbnail already exists: {thumbnail_path}")
+            return
+    
+        # Open the video file
+        cap = cv2.VideoCapture(str(video_file))
+        if not cap.isOpened():
+            print(f"Error opening video file: {video_path}")
+            return
+    
+        # Calculate the frame number at the specified timestamp
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_number = int(fps * timestamp)
+    
+        # Set the video to the desired frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+    
+        # Read the frame
+        ret, frame = cap.read()
+        if ret:
+            # Save the frame as an image
+            cv2.imwrite(str(thumbnail_path), frame)
+            print(f"Thumbnail created: {thumbnail_path}")
+        else:
+            print(f"Error reading frame at {timestamp} seconds")
+    
+        # Release the video capture object
+        cap.release()
+    
+    if __name__ == "__main__":
+        current_dir = Path(".")
+        mp4_files = list(current_dir.glob("*.mp4"))
+    
+        if not mp4_files:
+            print("No .mp4 files found in the current directory.")
+        else:
+            for video_file in mp4_files:
+                generate_video_thumbnail(video_file)
+    --- End of video_thumbnails.py ---
+
+[File] virtual_competitors.py
+--- Start of virtual_competitors.py ---
+import random
+from datetime import timedelta
+
+def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competitors=3):
+    strategies = ["even", "positive_split", "negative_split", "mid_surge", "random"]
+    competitors = []
+    for i in range(num_competitors):
+        variation = random.uniform(-0.05, 0.05)  # ±5% duration variation
+        comp_time = user_duration_min * (1 + variation)
+        comp_avg_speed = user_avg_speed * (user_duration_min / comp_time)  # Adjust speed to match new time
+        strategy = random.choice(strategies)
+        competitors.append({
+            "name": f"Ghost {chr(65+i)}",
+            "duration_min": comp_time,
+            "avg_speed": comp_avg_speed,
+            "strategy": strategy
+        })
+    return competitors
+
+def generate_speed_profile(duration_min, avg_speed, strategy):
+    segments = 10
+    segment_duration = duration_min * 60 / segments
+    speed_profile = []
+
+    if strategy == "even":
+        for i in range(segments):
+            speed_profile.append((i * segment_duration, avg_speed))
+    elif strategy == "positive_split":
+        for i in range(segments):
+            speed = avg_speed + (i / segments) * (avg_speed * 0.2)
+            speed_profile.append((i * segment_duration, speed))
+    elif strategy == "negative_split":
+        for i in range(segments):
+            speed = avg_speed - (i / segments) * (avg_speed * 0.2)
+            speed_profile.append((i * segment_duration, speed))
+    elif strategy == "mid_surge":
+        for i in range(segments):
+            speed = avg_speed * 1.2 if segments // 3 <= i < 2 * segments // 3 else avg_speed
+            speed_profile.append((i * segment_duration, speed))
+    elif strategy == "random":
+        for i in range(segments):
+            speed = random.uniform(avg_speed * 0.8, avg_speed * 1.2)
+            speed_profile.append((i * segment_duration, speed))
+
+    return speed_profile
+
+def generate_competitors_with_profiles(user_duration_min, user_avg_speed, num_competitors=3):
+    competitors = generate_competitor_profiles(user_duration_min, user_avg_speed, num_competitors)
+    for competitor in competitors:
+        competitor["speed_profile"] = generate_speed_profile(
+            competitor["duration_min"],
+            competitor["avg_speed"],
+            competitor["strategy"]
+        )
+    return competitors
+
+if __name__ == "__main__":
+    user_duration_min = 30
+    user_avg_speed = 10.0
+    competitors = generate_competitors_with_profiles(user_duration_min, user_avg_speed)
+    for competitor in competitors:
+        print(f"Competitor: {competitor['name']}")
+        print(f"Duration: {competitor['duration_min']:.2f} min")
+        print(f"Average Speed: {competitor['avg_speed']:.2f} km/h")
+        print(f"Strategy: {competitor['strategy']}")
+        print("Speed Profile:")
+        for timestamp, speed in competitor["speed_profile"]:
+            print(f"{str(timedelta(seconds=timestamp))} — {speed:.2f} km/h")
+        print()
+--- End of virtual_competitors.py ---
+
+[File] zwo_parser.py
+--- Start of zwo_parser.py ---
+import xml.etree.ElementTree as ET
+import os
+
+def parse_zwo_file(file_path, starting_speed):
+    """
+    Parses a single ZWO file and converts it into a routine format.
+    Each interval's speed is calculated as (power * starting_speed),
+    and the speed increment is (target_speed - starting_speed).
+    """
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    routine_name = root.find('name').text.strip()
+    routine = []
+
+    for block in root.find('workout'):
+        duration_sec = int(block.attrib.get('Duration', 0))
+        duration_min = duration_sec / 60
+
+        if 'Power' in block.attrib:
+            power = float(block.attrib['Power'])
+        else:
+            power_low = float(block.attrib.get('PowerLow', 0))
+            power_high = float(block.attrib.get('PowerHigh', 0))
+            power = (power_low + power_high) / 2
+
+        target_speed = power * starting_speed
+        speed_increment = target_speed - starting_speed
+        routine.append((duration_min, speed_increment))
+
+    return {routine_name: routine}
+
+def load_all_zwo_routines(folder_path, starting_speed):
+    """
+    Loads all .zwo files in the given folder and returns a dictionary
+    of routines using the starting speed as the 5k pace.
+    """
+    routines = {}
+    for file in os.listdir(folder_path):
+        if file.lower().endswith('.zwo'):
+            full_path = os.path.join(folder_path, file)
+            try:
+                routines.update(parse_zwo_file(full_path, starting_speed))
+            except Exception as e:
+                print(f"Failed to parse {file}: {e}")
+    return routines
+--- End of zwo_parser.py ---
+
