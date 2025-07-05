@@ -1,7 +1,17 @@
 import cv2
 import asyncio
 import time
+import subprocess
 from ghost_runner_hud import GhostRunnerHUD
+
+def get_screen_resolution():
+    try:
+        output = subprocess.check_output("xrandr | grep '*' | awk '{print $1}'", shell=True)
+        resolution = output.decode().strip().split('x')
+        return int(resolution[0]), int(resolution[1])
+    except Exception as e:
+        print("Could not determine screen resolution:", e)
+        return 1280, 720  # fallback resolution
 
 async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, start_time, ghost_gap_queue, exit_signal):
     cap = cv2.VideoCapture(video_path)
@@ -13,6 +23,8 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
     ghost_runner_hud = GhostRunnerHUD()
     confirm_exit = False
     esc_pressed_once = False
+
+    screen_width, screen_height = get_screen_resolution()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -53,15 +65,16 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
                 y_offset -= 25
             ghost_runner_hud.draw_ghost_runners(frame, last_ghost_gaps)
 
-        # Exit confirmation
         if confirm_exit:
             overlay = frame.copy()
             cv2.rectangle(overlay, (200, 200), (600, 400), (0, 0, 0), -1)
             cv2.putText(overlay, "Exit workout?", (250, 270), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
             cv2.putText(overlay, "Y = Yes, ESC = No", (250, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-
             alpha = 0.7
             cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+        # Resize to screen resolution before displaying
+        frame = cv2.resize(frame, (screen_width, screen_height))
 
         # Display
         cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
@@ -73,7 +86,6 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         if not confirm_exit and key in [27, 8]:  # ESC or BACK
             confirm_exit = True
             esc_pressed_once = True
-
         elif confirm_exit:
             if key in [ord('y'), ord('Y'), 13, 10]:  # Y or Enter
                 exit_signal.put(True)
