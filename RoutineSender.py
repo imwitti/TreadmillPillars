@@ -5,7 +5,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-
+from post_workout_stats import show_post_workout_stats
 from RunRoutine import exercise_routine
 from zwo_parser import load_all_zwo_routines
 from menu_ui import run_selection_ui
@@ -116,11 +116,20 @@ async def main():
     selected_routine = routines[routine_name]
 
     show_status(screen, font, "Starting video and routine...")
-    await exercise_routine(
-        selected_speed,
-        [(d, selected_speed + inc) for d, inc in selected_routine],
-        str(video_path)
+    result = await exercise_routine(
+         selected_speed,
+         [(d, selected_speed + inc) for d, inc in selected_routine],
+         str(video_path)
     )
+
+    if result:
+         show_post_workout_stats(
+         workout_data=result["workout_data"],
+         start_time=result["start_time"],
+         end_time=result["end_time"]
+         # tcx_filename=result.get("tcx_filename")  # Optional if you add it later
+         )
+
 
 
 if __name__ == "__main__":

@@ -40,7 +40,6 @@ def simulate_ghost_distance(speed_profile, elapsed_seconds):
         if elapsed_seconds < t_end:
             break
     return distance * 1000  # meters
-
 async def exercise_routine(initial_speed, routine, video_path):
     treadmill = TreadmillControl()
     await treadmill.connect()
@@ -55,6 +54,7 @@ async def exercise_routine(initial_speed, routine, video_path):
     distance_queue = queue.Queue()
     distance_queue.put(0.0)
     ghost_gap_queue = queue.Queue()
+    exit_signal = queue.Queue()  # 🆕 Added for graceful exit
 
     start_time = datetime.utcnow()
     workout_data = []
@@ -107,23 +107,36 @@ async def exercise_routine(initial_speed, routine, video_path):
             ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
             gap = user_distance_m - ghost_distance_m
             ghost_gaps[ghost["name"]] = gap
-            print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
+            #print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
         ghost_gap_queue.put(ghost_gaps)
 
     await treadmill.start_monitoring(callback)
 
     video_task = asyncio.create_task(
-        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue)
+        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue, exit_signal)  # 🆕 pass exit_signal
     )
 
-    for duration, speed_increment in routine:
-        await treadmill.set_speed(speed_increment)
-        await asyncio.sleep(duration * 60)
+    try:
+        for duration, speed_increment in routine:
+            await treadmill.set_speed(speed_increment)
+            for _ in range(int(duration * 60)):
+                await asyncio.sleep(1)
+                if not exit_signal.empty():
+                    raise asyncio.CancelledError("User requested exit")
+    except asyncio.CancelledError:
+        print("Workout interrupted by user.")
+    finally:
+        await treadmill.stop_monitoring()
+        await treadmill.disconnect()
+        await video_task
 
-    await treadmill.stop_monitoring()
-    await treadmill.disconnect()
-    await video_task
+        end_time = datetime.utcnow()
+        final_distance = workout_data[-1]["distance"] if workout_data else 0.0
+        finalize_tcx_file(start_time, end_time, final_distance)
 
-    end_time = datetime.utcnow()
-    final_distance = workout_data[-1]["distance"] if workout_data else 0.0
-    finalize_tcx_file(start_time, end_time, final_distance)
+        return {
+            "start_time": start_time,
+            "end_time": end_time,
+            "workout_data": workout_data,
+            "final_distance": final_distance
+        }
