@@ -68,15 +68,31 @@ def run_thumbnail_generators():
 
 
 def display_pb_times(screen, font, pb_times):
-    screen.fill(BLACK)
-    y = 60
-    for km in ["1", "3", "5", "10", "21"]:
-        if km in pb_times:
-            txt = font.render(f"PB {km}km: {pb_times[km]:.1f} min", True, WHITE)
-            screen.blit(txt, (60, y))
-            y += 40
+    # Load and scale the background image
+    background_image = pygame.image.load("assets/background.jpg").convert()
+    background_image = pygame.transform.scale(background_image, screen.get_size())
+
+    # Draw the background
+    screen.blit(background_image, (0, 0))
+    
+    y = 100  # starting y-position for text
+    screen_width = screen.get_width()
+
+    for km_str in ["1", "3", "5", "10", "21"]:
+        if km_str in pb_times:
+            km = float(km_str)
+            speed = km / (pb_times[km_str] / 60)  # speed in km/h
+            
+            text_str = f"PB {km_str}km: {pb_times[km_str]:.1f} min Speed: {speed:.1f} kmph"
+            txt_surface = font.render(text_str, True, (255, 255, 255))  # white text
+            text_rect = txt_surface.get_rect(center=(screen_width // 2, y))
+            
+            screen.blit(txt_surface, text_rect)
+            y += 50  # vertical spacing between lines
+
     pygame.display.flip()
-    pygame.time.wait(3000)
+    pygame.time.wait(5000)
+
 
 
 def show_status(screen, font, message):
@@ -107,7 +123,7 @@ async def main():
     videos = list_videos('videos')
     video_data = [(v[0], f"{v[1].capitalize()} ({v[2]} km/h {v[3]}km)") for v in videos]
 
-    routine_name, video_path, selected_speed = run_selection_ui(screen, font, routines, video_data, zwo_speed)
+    routine_name, video_path, selected_speed = run_selection_ui(screen, routines, video_data, zwo_speed)
     if not all([routine_name, video_path, selected_speed]):
         pygame.quit()
         return
