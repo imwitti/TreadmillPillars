@@ -83,7 +83,7 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
 
         key = cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF
 
-        if not confirm_exit and key in [27, 8]:  # ESC or BACK
+        if not confirm_exit and key in [27, 8, 38]:  # ESC or BACK
             confirm_exit = True
             esc_pressed_once = True
         elif confirm_exit:
@@ -92,7 +92,7 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
                 break
             elif key in [ord('n'), ord('N')]:  # N
                 confirm_exit = False
-            elif key in [27, 8] and esc_pressed_once:  # ESC again = No
+            elif key in [27, 8,38] and esc_pressed_once:  # ESC again = No
                 confirm_exit = False
                 esc_pressed_once = False
 
