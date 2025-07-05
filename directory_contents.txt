@@ -11,6 +11,8 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
     [Folder] objects/
         [Folder] 01/
         [Folder] 05/
+        [Folder] 06/
+        [Folder] 09/
         [Folder] 0a/
         [Folder] 0d/
         [Folder] 0e/
@@ -26,55 +28,81 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 27/
         [Folder] 2a/
         [Folder] 2d/
+        [Folder] 2e/
+        [Folder] 2f/
         [Folder] 31/
+        [Folder] 34/
+        [Folder] 3b/
         [Folder] 3d/
         [Folder] 40/
         [Folder] 48/
         [Folder] 49/
+        [Folder] 4b/
         [Folder] 4e/
         [Folder] 53/
         [Folder] 54/
         [Folder] 55/
+        [Folder] 56/
+        [Folder] 58/
         [Folder] 5b/
         [Folder] 5f/
+        [Folder] 61/
         [Folder] 62/
         [Folder] 67/
         [Folder] 68/
         [Folder] 69/
         [Folder] 6a/
         [Folder] 6b/
+        [Folder] 6d/
         [Folder] 6e/
         [Folder] 6f/
         [Folder] 73/
         [Folder] 74/
+        [Folder] 77/
         [Folder] 78/
+        [Folder] 7d/
+        [Folder] 7e/
+        [Folder] 81/
         [Folder] 83/
         [Folder] 86/
+        [Folder] 8a/
+        [Folder] 8c/
         [Folder] 90/
         [Folder] 92/
         [Folder] 93/
+        [Folder] 95/
         [Folder] 96/
         [Folder] 9d/
+        [Folder] 9e/
         [Folder] a1/
+        [Folder] a3/
         [Folder] a5/
         [Folder] a9/
         [Folder] ad/
         [Folder] ae/
+        [Folder] af/
         [Folder] b5/
         [Folder] b7/
         [Folder] bd/
+        [Folder] c0/
+        [Folder] c2/
+        [Folder] c3/
         [Folder] c6/
+        [Folder] c7/
         [Folder] ca/
         [Folder] d1/
+        [Folder] d6/
         [Folder] d9/
         [Folder] db/
         [Folder] df/
         [Folder] e0/
         [Folder] e4/
+        [Folder] e6/
         [Folder] e9/
         [Folder] ea/
         [Folder] ee/
         [Folder] f0/
+        [Folder] f2/
         [Folder] f9/
         [Folder] fe/
         [Folder] info/
@@ -144,29 +172,45 @@ def parse_video_title(title):
 
 def run_thumbnail_generators():
     print("Generating thumbnails...")
-    routines_script = Path('Routines') / 'generate_ZWO_thumbnail.py'
+    routines_script = Path('routines') / 'generate_zwo_thumbnail.py'
     if routines_script.exists():
-        subprocess.run([sys.executable, str(routines_script.name)], cwd='Routines')
+        subprocess.run([sys.executable, str(routines_script.name)], cwd='routines')
     else:
         print("ZWO thumbnail generator not found.")
 
-    videos_script = Path('Videos') / 'video_thumbnails.py'
+    videos_script = Path('videos') / 'video_thumbnails.py'
     if videos_script.exists():
-        subprocess.run([sys.executable, str(videos_script.name)], cwd='Videos')
+        subprocess.run([sys.executable, str(videos_script.name)], cwd='videos')
     else:
         print("Video thumbnail generator not found.")
 
 
 def display_pb_times(screen, font, pb_times):
-    screen.fill(BLACK)
-    y = 60
-    for km in ["1", "3", "5", "10", "21"]:
-        if km in pb_times:
-            txt = font.render(f"PB {km}km: {pb_times[km]:.1f} min", True, WHITE)
-            screen.blit(txt, (60, y))
-            y += 40
+    # Load and scale the background image
+    background_image = pygame.image.load("assets/background.jpg").convert()
+    background_image = pygame.transform.scale(background_image, screen.get_size())
+
+    # Draw the background
+    screen.blit(background_image, (0, 0))
+    
+    y = 100  # starting y-position for text
+    screen_width = screen.get_width()
+
+    for km_str in ["1", "3", "5", "10", "21"]:
+        if km_str in pb_times:
+            km = float(km_str)
+            speed = km / (pb_times[km_str] / 60)  # speed in km/h
+            
+            text_str = f"PB {km_str}km: {pb_times[km_str]:.1f} min Speed: {speed:.1f} kmph"
+            txt_surface = font.render(text_str, True, (255, 255, 255))  # white text
+            text_rect = txt_surface.get_rect(center=(screen_width // 2, y))
+            
+            screen.blit(txt_surface, text_rect)
+            y += 50  # vertical spacing between lines
+
     pygame.display.flip()
-    pygame.time.wait(3000)
+    pygame.time.wait(5000)
+
 
 
 def show_status(screen, font, message):
@@ -197,7 +241,7 @@ async def main():
     videos = list_videos('videos')
     video_data = [(v[0], f"{v[1].capitalize()} ({v[2]} km/h {v[3]}km)") for v in videos]
 
-    routine_name, video_path, selected_speed = run_selection_ui(screen, font, routines, video_data, zwo_speed)
+    routine_name, video_path, selected_speed = run_selection_ui(screen, routines, video_data, zwo_speed)
     if not all([routine_name, video_path, selected_speed]):
         pygame.quit()
         return
@@ -207,18 +251,18 @@ async def main():
 
     show_status(screen, font, "Starting video and routine...")
     result = await exercise_routine(
-        selected_speed,
-        [(d, selected_speed + inc) for d, inc in selected_routine],
-        str(video_path)
+         selected_speed,
+         [(d, selected_speed + inc) for d, inc in selected_routine],
+         str(video_path)
     )
 
     if result:
-        show_post_workout_stats(
-            workout_data=result["workout_data"],
-            start_time=result["start_time"],
-            end_time=result["end_time"]
-            # tcx_filename=result.get("tcx_filename")  # Optional if you add it later
-        )
+         show_post_workout_stats(
+         workout_data=result["workout_data"],
+         start_time=result["start_time"],
+         end_time=result["end_time"]
+         # tcx_filename=result.get("tcx_filename")  # Optional if you add it later
+         )
 
 
 
@@ -340,7 +384,7 @@ async def exercise_routine(initial_speed, routine, video_path):
             ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
             gap = user_distance_m - ghost_distance_m
             ghost_gaps[ghost["name"]] = gap
-            print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
+            #print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
         ghost_gap_queue.put(ghost_gaps)
 
     await treadmill.start_monitoring(callback)
@@ -377,6 +421,8 @@ async def exercise_routine(initial_speed, routine, video_path):
 
 [Folder] TCX/
 [Folder] __pycache__/
+[Folder] assets/
+[Folder] fonts/
 [File] ghost_runner_hud.py
 --- Start of ghost_runner_hud.py ---
 import cv2
@@ -555,16 +601,32 @@ import pygame
 from pathlib import Path
 import os
 
+# Colors
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
+BLACK = (20, 20, 20)
 HIGHLIGHT = (50, 200, 255)
-LIGHT_HIGHLIGHT = (80, 80, 120)
-FONT_SIZE = 36
-TITLE_FONT_SIZE = 18
-THUMBNAIL_SIZE = (120, 90)
-ITEM_SPACING = 150
-CAROUSEL_Y_POSITIONS = [120, 260, 400]
-START_BUTTON_Y = 520
+LIGHT_HIGHLIGHT = (80, 120, 160)
+SHADOW = (10, 10, 10)
+GRADIENT_START = (30, 30, 40)
+GRADIENT_END = (10, 10, 20)
+
+# Sizes
+FONT_SIZE = 18
+TITLE_FONT_SIZE = 12
+THUMBNAIL_SIZE = (140, 100)
+SPEED_THUMBNAIL_SIZE = (120, 15)
+ITEM_SPACING = 160
+CAROUSEL_Y_POSITIONS = [120, 280, 420]
+START_BUTTON_Y = 500
+
+# Load Roboto fonts
+def load_fonts():
+    fonts = {}
+    fonts['regular'] = pygame.font.Font("fonts/Roboto-Regular.ttf", FONT_SIZE)
+    fonts['bold'] = pygame.font.Font("fonts/Roboto-Bold.ttf", FONT_SIZE)
+    fonts['title'] = pygame.font.Font("fonts/Roboto-Bold.ttf", TITLE_FONT_SIZE)
+    fonts['start'] = pygame.font.Font("fonts/Roboto-Bold.ttf", 24)
+    return fonts
 
 def load_thumbnail(path, size=THUMBNAIL_SIZE):
     p = Path(path)
@@ -576,29 +638,43 @@ def load_thumbnail(path, size=THUMBNAIL_SIZE):
     except Exception:
         return None
 
-def run_selection_ui(screen, font, routines, videos, start_speed=8.5):
-    title_font = pygame.font.Font(None, TITLE_FONT_SIZE)
+def draw_vertical_gradient(surface, color_start, color_end):
+    height = surface.get_height()
+    for y in range(height):
+        ratio = y / height
+        r = int(color_start[0] * (1 - ratio) + color_end[0] * ratio)
+        g = int(color_start[1] * (1 - ratio) + color_end[1] * ratio)
+        b = int(color_start[2] * (1 - ratio) + color_end[2] * ratio)
+        pygame.draw.line(surface, (r, g, b), (0, y), (surface.get_width(), y))
+
+def run_selection_ui(screen, routines, videos, start_speed=8.5):
+    fonts = load_fonts()
 
     routine_names = list(routines.keys())
-    routine_thumbs = [load_thumbnail(f"Routines/{name}.png") for name in routine_names]
+    routine_thumbs = [load_thumbnail(f"routines/{name}.png") for name in routine_names]
 
     video_files = [v[0] for v in videos]
     video_labels = [v[1] for v in videos]
-    video_thumbs = [load_thumbnail(f"Videos/{Path(v[0]).with_suffix('.png').name}") for v in videos]
+    video_thumbs = [load_thumbnail(f"videos/{Path(v[0]).with_suffix('.png').name}") for v in videos]
 
     speeds = [round(x * 0.1, 1) for x in range(10, 201)]
     start_speed = max(1.0, min(start_speed, 20.0))
     speed_idx = min(range(len(speeds)), key=lambda i: abs(speeds[i] - start_speed))
 
-    selections = [0, 0, speed_idx]  # routine, video, speed
+    selections = [0, 0, speed_idx]
     offsets = [0, 0, max(0, speed_idx - 2)]
-    focused = 0  # 0=routine, 1=video, 2=speed, 3=start
+    focused = 0
 
     clock = pygame.time.Clock()
     running = True
 
+    # Load and scale background image
+    background_path = "assets/background.jpg"
+    background_img = pygame.image.load(background_path).convert()
+    background_img = pygame.transform.scale(background_img, screen.get_size())
+
     while running:
-        screen.fill(BLACK)
+        screen.blit(background_img, (0, 0))
         screen_width = screen.get_width()
 
         for carousel_i in range(3):
@@ -610,14 +686,17 @@ def run_selection_ui(screen, font, routines, videos, start_speed=8.5):
                 items = routine_names
                 thumbs = routine_thumbs
                 titles = routine_names
+                thumb_size = THUMBNAIL_SIZE
             elif carousel_i == 1:
                 items = video_labels
                 thumbs = video_thumbs
                 titles = video_labels
+                thumb_size = THUMBNAIL_SIZE
             else:
                 items = [f"{s:.1f} km/h" for s in speeds]
                 thumbs = [None] * len(items)
                 titles = items
+                thumb_size = SPEED_THUMBNAIL_SIZE
 
             visible_range = range(offset, min(offset + 5, len(items)))
             total_width = (len(visible_range) - 1) * ITEM_SPACING
@@ -629,55 +708,51 @@ def run_selection_ui(screen, font, routines, videos, start_speed=8.5):
                 is_focused = (carousel_i == focused)
 
                 label_text = titles[idx]
-                label_surf = title_font.render(label_text, True, WHITE)
-                label_rect = label_surf.get_rect(center=(x, y + THUMBNAIL_SIZE[1] // 2 + 20))
+                font_to_use = fonts['bold'] if is_selected else fonts['regular']
+                label_surf = font_to_use.render(label_text, True, WHITE)
+                label_rect = label_surf.get_rect(center=(x, y + thumb_size[1] // 2 + 25))
 
                 if is_selected:
-                    if carousel_i == 2:
-                        # Speed background highlight behind label
-                        bg_color = HIGHLIGHT if is_focused else LIGHT_HIGHLIGHT
-                        padding = 10
-                        bg_rect = pygame.Rect(
-                            label_rect.left - padding,
-                            label_rect.top - padding,
-                            label_rect.width + 2 * padding,
-                            label_rect.height + 2 * padding
-                        )
-                        pygame.draw.rect(screen, bg_color, bg_rect)
-                    else:
-                        # Routine/Video background highlight behind thumb + label
-                        thumb_h = THUMBNAIL_SIZE[1]
-                        full_rect = pygame.Rect(
-                            x - THUMBNAIL_SIZE[0] // 2 - 10,
-                            y - thumb_h // 2 - 10,
-                            THUMBNAIL_SIZE[0] + 20,
-                            thumb_h + 20 + 30  # padding + label space
-                        )
-                        bg_color = HIGHLIGHT if is_focused else LIGHT_HIGHLIGHT
-                        pygame.draw.rect(screen, bg_color, full_rect)
+                    shadow_rect = pygame.Rect(
+                        x - thumb_size[0] // 2 - 15,
+                        y - thumb_size[1] // 2 - 15,
+                        thumb_size[0] + 30,
+                        thumb_size[1] + 70
+                    )
+                    shadow_surf = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
+                    shadow_surf.fill((*SHADOW, 100))
+                    screen.blit(shadow_surf, shadow_rect.topleft)
 
-                if carousel_i != 2:
-                    if thumbs[idx]:
-                        thumb_rect = thumbs[idx].get_rect(center=(x, y))
-                        screen.blit(thumbs[idx], thumb_rect)
-                    else:
-                        rect = pygame.Rect(x - THUMBNAIL_SIZE[0] // 2, y - THUMBNAIL_SIZE[1] // 2,
-                                           THUMBNAIL_SIZE[0], THUMBNAIL_SIZE[1])
-                        pygame.draw.rect(screen, WHITE, rect, 2)
+                    highlight_color = HIGHLIGHT if is_focused else LIGHT_HIGHLIGHT
+                    highlight_surf = pygame.Surface((thumb_size[0] + 20, thumb_size[1] + 60), pygame.SRCALPHA)
+                    alpha = 180 if is_focused else 100
+                    highlight_surf.fill((*highlight_color, alpha))
+                    screen.blit(highlight_surf, (x - thumb_size[0] // 2 - 10, y - thumb_size[1] // 2 - 10))
+
+                if carousel_i != 2 and thumbs[idx]:
+                    thumb_rect = thumbs[idx].get_rect(center=(x, y))
+                    screen.blit(thumbs[idx], thumb_rect)
+                elif carousel_i != 2:
+                    rect = pygame.Rect(x - thumb_size[0] // 2, y - thumb_size[1] // 2,
+                                       thumb_size[0], thumb_size[1])
+                    pygame.draw.rect(screen, WHITE, rect, 2)
 
                 screen.blit(label_surf, label_rect)
 
-        # Draw START button
-        start_rect = pygame.Rect(screen_width // 2 - 100, START_BUTTON_Y, 200, 50)
-        if focused == 3:
-            pygame.draw.rect(screen, HIGHLIGHT, start_rect)
-            start_text = font.render("START", True, BLACK)
-        else:
-            pygame.draw.rect(screen, WHITE, start_rect, 2)
-            start_text = font.render("START", True, WHITE)
-        start_text_rect = start_text.get_rect(center=start_rect.center)
-        screen.blit(start_text, start_text_rect)
+        # START button
+        start_rect = pygame.Rect(screen_width // 2 - 120, START_BUTTON_Y, 240, 60)
+        shadow_surf = pygame.Surface((start_rect.width + 10, start_rect.height + 10), pygame.SRCALPHA)
+        shadow_surf.fill((*SHADOW, 150))
+        screen.blit(shadow_surf, (start_rect.x + 5, start_rect.y + 5))
 
+        if focused == 3:
+            pygame.draw.rect(screen, HIGHLIGHT, start_rect, border_radius=8)
+            start_text = fonts['start'].render("START", True, BLACK)
+        else:
+            pygame.draw.rect(screen, WHITE, start_rect, 3, border_radius=8)
+            start_text = fonts['start'].render("START", True, WHITE)
+
+        screen.blit(start_text, start_text.get_rect(center=start_rect.center))
         pygame.display.flip()
 
         for event in pygame.event.get():
@@ -694,9 +769,11 @@ def run_selection_ui(screen, font, routines, videos, start_speed=8.5):
                     focused = (focused - 1) % 4
                 elif event.key == pygame.K_RIGHT:
                     if focused < 3:
-                        max_idx = (len(routine_names) - 1 if focused == 0 else
-                                   len(video_labels) - 1 if focused == 1 else
-                                   len(speeds) - 1)
+                        max_idx = (
+                            len(routine_names) - 1 if focused == 0 else
+                            len(video_labels) - 1 if focused == 1 else
+                            len(speeds) - 1
+                        )
                         if selections[focused] < max_idx:
                             selections[focused] += 1
                             if selections[focused] >= offsets[focused] + 5:
@@ -706,12 +783,11 @@ def run_selection_ui(screen, font, routines, videos, start_speed=8.5):
                         selections[focused] -= 1
                         if selections[focused] < offsets[focused]:
                             offsets[focused] = max(0, offsets[focused] - 1)
-                elif event.key == pygame.K_RETURN:
-                    if focused == 3:
-                        routine = routine_names[selections[0]]
-                        video_file = video_files[selections[1]]
-                        speed = speeds[selections[2]]
-                        return routine, os.path.join('videos', video_file), speed
+                elif event.key == pygame.K_RETURN and focused == 3:
+                    routine = routine_names[selections[0]]
+                    video_file = video_files[selections[1]]
+                    speed = speeds[selections[2]]
+                    return routine, os.path.join('videos', video_file), speed
 
         clock.tick(30)
 --- End of menu_ui.py ---
@@ -1264,7 +1340,17 @@ def parse_treadmill_data(data):
 import cv2
 import asyncio
 import time
+import subprocess
 from ghost_runner_hud import GhostRunnerHUD
+
+def get_screen_resolution():
+    try:
+        output = subprocess.check_output("xrandr | grep '*' | awk '{print $1}'", shell=True)
+        resolution = output.decode().strip().split('x')
+        return int(resolution[0]), int(resolution[1])
+    except Exception as e:
+        print("Could not determine screen resolution:", e)
+        return 1280, 720  # fallback resolution
 
 async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, start_time, ghost_gap_queue, exit_signal):
     cap = cv2.VideoCapture(video_path)
@@ -1272,9 +1358,12 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
     last_known_distance = 0.0
     last_ghost_gaps = {}
 
-    speed_ratio = 1.0  # default speed ratio
+    speed_ratio = 1.0
     ghost_runner_hud = GhostRunnerHUD()
     confirm_exit = False
+    esc_pressed_once = False
+
+    screen_width, screen_height = get_screen_resolution()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -1290,55 +1379,61 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         if not ghost_gap_queue.empty():
             last_ghost_gaps = ghost_gap_queue.get()
 
-        # HUD: Speed (top-left)
+        # HUD
         hud_speed_text = f"{last_known_speed:.1f} km/h"
         cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # HUD: Distance (top-right)
         hud_distance_text = f"{last_known_distance:.0f} km"
         (text_width, text_height), _ = cv2.getTextSize(hud_distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-        x_position = frame.shape[1] - text_width - 10
-        y_position = text_height + 10
-        cv2.putText(frame, hud_distance_text, (x_position, y_position), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, hud_distance_text, (frame.shape[1] - text_width - 10, text_height + 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # HUD: Time (bottom-left)
         elapsed_time = time.time() - start_time
         hud_time_text = f"Time: {int(elapsed_time // 60)}:{int(elapsed_time % 60):02d}"
-        cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # HUD: Ghost Gaps (bottom-right)
         if last_ghost_gaps:
             y_offset = frame.shape[0] - 30
             for name, gap in sorted(last_ghost_gaps.items(), reverse=True):
                 gap_text = f"{name}: {'+' if gap >= 0 else ''}{gap:.1f} m"
-                text_size = cv2.getTextSize(gap_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-                x_pos = frame.shape[1] - text_size[0] - 10
-                cv2.putText(frame, gap_text, (x_pos, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                (text_width, _), _ = cv2.getTextSize(gap_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+                x_position = frame.shape[1] - text_width - 10
+                cv2.putText(frame, gap_text, (x_position, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
                 y_offset -= 25
-
             ghost_runner_hud.draw_ghost_runners(frame, last_ghost_gaps)
 
-        # Confirmation overlay
         if confirm_exit:
             overlay = frame.copy()
             cv2.rectangle(overlay, (200, 200), (600, 400), (0, 0, 0), -1)
             cv2.putText(overlay, "Exit workout?", (250, 270), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-            cv2.putText(overlay, "Y = Yes, N = No", (250, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+            cv2.putText(overlay, "Y = Yes, ESC = No", (250, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             alpha = 0.7
             cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
+        # Resize to screen resolution before displaying
+        frame = cv2.resize(frame, (screen_width, screen_height))
+
+        # Display
         cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
         cv2.setWindowProperty("Video", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.imshow("Video", frame)
 
         key = cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF
-        if key in [27, 8]:  # ESC or BACKSPACE
+
+        if not confirm_exit and key in [27, 8, 38]:  # ESC or BACK
             confirm_exit = True
-        elif confirm_exit and key in [ord('y'), ord('Y')]:
-            exit_signal.put(True)
-            break
-        elif confirm_exit and key in [ord('n'), ord('N')]:
-            confirm_exit = False
+            esc_pressed_once = True
+        elif confirm_exit:
+            if key in [ord('y'), ord('Y'), 13, 10]:  # Y or Enter
+                exit_signal.put(True)
+                break
+            elif key in [ord('n'), ord('N')]:  # N
+                confirm_exit = False
+            elif key in [27, 8,38] and esc_pressed_once:  # ESC again = No
+                confirm_exit = False
+                esc_pressed_once = False
 
         await asyncio.sleep(0)
 

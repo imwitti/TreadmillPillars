@@ -1,5 +1,6 @@
 import pygame
 from pathlib import Path
+import math
 import os
 
 # Colors
@@ -48,8 +49,48 @@ def draw_vertical_gradient(surface, color_start, color_end):
         b = int(color_start[2] * (1 - ratio) + color_end[2] * ratio)
         pygame.draw.line(surface, (r, g, b), (0, y), (surface.get_width(), y))
 
-def run_selection_ui(screen, routines, videos, start_speed=8.5):
+def run_selection_ui(screen, routines, videos, start_speed=8.5, pb_times=None):
+    import pygame
+    from pathlib import Path
+    import os
+
+    # Colors
+    WHITE = (255, 255, 255)
+    BLACK = (20, 20, 20)
+    HIGHLIGHT = (50, 200, 255)
+    LIGHT_HIGHLIGHT = (80, 120, 160)
+    SHADOW = (10, 10, 10)
+    GOLD = (255, 215, 0)
+
+    # Sizes
+    FONT_SIZE = 18
+    TITLE_FONT_SIZE = 12
+    THUMBNAIL_SIZE = (140, 100)
+    SPEED_THUMBNAIL_SIZE = (120, 15)
+    ITEM_SPACING = 160
+    CAROUSEL_Y_POSITIONS = [120, 280, 420]
+    START_BUTTON_Y = 500
+
+    def load_fonts():
+        fonts = {}
+        fonts['regular'] = pygame.font.Font("fonts/Roboto-Regular.ttf", FONT_SIZE)
+        fonts['bold'] = pygame.font.Font("fonts/Roboto-Bold.ttf", FONT_SIZE)
+        fonts['title'] = pygame.font.Font("fonts/Roboto-Bold.ttf", TITLE_FONT_SIZE)
+        fonts['start'] = pygame.font.Font("fonts/Roboto-Bold.ttf", 24)
+        return fonts
+
+    def load_thumbnail(path, size=THUMBNAIL_SIZE):
+        p = Path(path)
+        if not p.exists():
+            return None
+        try:
+            img = pygame.image.load(str(p)).convert_alpha()
+            return pygame.transform.smoothscale(img, size)
+        except Exception:
+            return None
+
     fonts = load_fonts()
+    pb_times = pb_times or {}
 
     routine_names = list(routines.keys())
     routine_thumbs = [load_thumbnail(f"routines/{name}.png") for name in routine_names]
@@ -69,7 +110,6 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5):
     clock = pygame.time.Clock()
     running = True
 
-    # Load and scale background image
     background_path = "assets/background.jpg"
     background_img = pygame.image.load(background_path).convert()
     background_img = pygame.transform.scale(background_img, screen.get_size())
@@ -129,6 +169,27 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5):
                     alpha = 180 if is_focused else 100
                     highlight_surf.fill((*highlight_color, alpha))
                     screen.blit(highlight_surf, (x - thumb_size[0] // 2 - 10, y - thumb_size[1] // 2 - 10))
+
+                # PB Highlighting
+                if carousel_i == 2:
+                    selected_routine = routines[routine_names[selections[0]]]
+                    total_duration = sum(d for d, _ in selected_routine)
+                    increments = [inc for _, inc in selected_routine]
+                    avg_increment = sum(increments) / len(increments) if increments else 0
+
+                    for dist_str, pb_time in pb_times.items():
+                        try:
+                            dist_km = float(dist_str)
+                            pb_speed = dist_km / (pb_time / 60)
+                            import math
+                            base_speed = math.ceil((pb_speed - avg_increment) * 10) / 10
+
+                            if abs(speeds[idx] - base_speed) < 0.1:
+                                pygame.draw.circle(screen, GOLD, (x, y), thumb_size[1] // 2 + 10, 3)
+                                label = fonts['title'].render(f"🏅 {dist_str}k PB", True, GOLD)
+                                screen.blit(label, label.get_rect(center=(x, y - 25)))
+                        except Exception:
+                            continue
 
                 if carousel_i != 2 and thumbs[idx]:
                     thumb_rect = thumbs[idx].get_rect(center=(x, y))

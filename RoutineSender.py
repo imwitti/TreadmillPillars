@@ -123,7 +123,8 @@ async def main():
     videos = list_videos('videos')
     video_data = [(v[0], f"{v[1].capitalize()} ({v[2]} km/h {v[3]}km)") for v in videos]
 
-    routine_name, video_path, selected_speed = run_selection_ui(screen, routines, video_data, zwo_speed)
+    routine_name, video_path, selected_speed = run_selection_ui(screen, routines, video_data, zwo_speed, pb_times=pb_times)
+
     if not all([routine_name, video_path, selected_speed]):
         pygame.quit()
         return
