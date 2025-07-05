@@ -54,13 +54,13 @@ def parse_video_title(title):
 
 def run_thumbnail_generators():
     print("Generating thumbnails...")
-    routines_script = Path('Routines') / 'generate_ZWO_thumbnail.py'
+    routines_script = Path('routines') / 'generate_zwo_thumbnail.py'
     if routines_script.exists():
         subprocess.run([sys.executable, str(routines_script.name)], cwd='Routines')
     else:
         print("ZWO thumbnail generator not found.")
 
-    videos_script = Path('Videos') / 'video_thumbnails.py'
+    videos_script = Path('videos') / 'video_thumbnails.py'
     if videos_script.exists():
         subprocess.run([sys.executable, str(videos_script.name)], cwd='Videos')
     else:

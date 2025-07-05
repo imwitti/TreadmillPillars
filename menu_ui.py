@@ -52,11 +52,11 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5):
     fonts = load_fonts()
 
     routine_names = list(routines.keys())
-    routine_thumbs = [load_thumbnail(f"Routines/{name}.png") for name in routine_names]
+    routine_thumbs = [load_thumbnail(f"routines/{name}.png") for name in routine_names]
 
     video_files = [v[0] for v in videos]
     video_labels = [v[1] for v in videos]
-    video_thumbs = [load_thumbnail(f"Videos/{Path(v[0]).with_suffix('.png').name}") for v in videos]
+    video_thumbs = [load_thumbnail(f"videos/{Path(v[0]).with_suffix('.png').name}") for v in videos]
 
     speeds = [round(x * 0.1, 1) for x in range(10, 201)]
     start_speed = max(1.0, min(start_speed, 20.0))
