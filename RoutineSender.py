@@ -1,6 +1,7 @@
 import sys
 import asyncio
 import pygame
+import platform
 import json
 import os
 import subprocess
@@ -19,6 +20,12 @@ pygame.init()
 screen = pygame.display.set_mode((800, 600), pygame.FULLSCREEN)
 pygame.display.set_caption("Routine Selector")
 font = pygame.font.Font(None, FONT_SIZE)
+
+def disable_screensaver():
+    if platform.system() == "Linux":
+        os.system("xset s off")
+        os.system("xset -dpms")
+        os.system("xset s noblank")
 
 
 def load_user_config(config_path='user_config.json'):
@@ -104,6 +111,7 @@ def show_status(screen, font, message):
 
 
 async def main():
+    disable_screensaver()
     user_config = load_user_config()
     pb_times = user_config.get("pb_times_minutes", {})
     display_pb_times(screen, font, pb_times)

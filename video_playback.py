@@ -1,24 +1,26 @@
 import cv2
 import asyncio
 import time
-import subprocess
+import platform
 from ghost_runner_hud import GhostRunnerHUD
 
 def get_screen_resolution():
+    if platform.system() == "Windows":
+        return 1280, 720  # You can change this as needed
     try:
+        import subprocess
         output = subprocess.check_output("xrandr | grep '*' | awk '{print $1}'", shell=True)
-        resolution = output.decode().strip().split('x')
-        return int(resolution[0]), int(resolution[1])
+        width, height = output.decode().strip().split('x')
+        return int(width), int(height)
     except Exception as e:
         print("Could not determine screen resolution:", e)
-        return 1280, 720  # fallback resolution
+        return 1280, 720
 
 async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, start_time, ghost_gap_queue, exit_signal):
     cap = cv2.VideoCapture(video_path)
     last_known_speed = 0.0
     last_known_distance = 0.0
     last_ghost_gaps = {}
-
     speed_ratio = 1.0
     ghost_runner_hud = GhostRunnerHUD()
     confirm_exit = False
@@ -31,14 +33,25 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         if not ret:
             break
 
-        if not speed_ratio_queue.empty():
-            speed_ratio = speed_ratio_queue.get()
-        if not speed_queue.empty():
-            last_known_speed = speed_queue.get()
-        if not distance_queue.empty():
-            last_known_distance = distance_queue.get()
-        if not ghost_gap_queue.empty():
-            last_ghost_gaps = ghost_gap_queue.get()
+        try:
+            speed_ratio = speed_ratio_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+
+        try:
+            last_known_speed = speed_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+
+        try:
+            last_known_distance = distance_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+
+        try:
+            last_ghost_gaps = ghost_gap_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
 
         # HUD
         hud_speed_text = f"{last_known_speed:.1f} km/h"
@@ -77,8 +90,8 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         frame = cv2.resize(frame, (screen_width, screen_height))
 
         # Display
-        cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty("Video", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Video", screen_width, screen_height)
         cv2.imshow("Video", frame)
 
         key = cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF
@@ -88,11 +101,11 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
             esc_pressed_once = True
         elif confirm_exit:
             if key in [ord('y'), ord('Y'), 13, 10]:  # Y or Enter
-                exit_signal.put(True)
+                await exit_signal.put(True)
                 break
-            elif key in [ord('n'), ord('N')]:  # N
+            elif key in [ord('n'), ord('N')]:
                 confirm_exit = False
-            elif key in [27, 8,38] and esc_pressed_once:  # ESC again = No
+            elif key in [27, 8, 38] and esc_pressed_once:
                 confirm_exit = False
                 esc_pressed_once = False
 

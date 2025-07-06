@@ -3,7 +3,6 @@ from treadmill_control import TreadmillControl, parse_treadmill_data
 from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
 from virtual_competitors import generate_competitors_with_profiles
-import queue
 import time
 from datetime import datetime
 import json
@@ -40,6 +39,7 @@ def simulate_ghost_distance(speed_profile, elapsed_seconds):
         if elapsed_seconds < t_end:
             break
     return distance * 1000  # meters
+
 async def exercise_routine(initial_speed, routine, video_path):
     treadmill = TreadmillControl()
     await treadmill.connect()
@@ -47,14 +47,15 @@ async def exercise_routine(initial_speed, routine, video_path):
     await asyncio.sleep(10)
     await treadmill.set_incline(1.0)
 
-    speed_ratio_queue = queue.Queue()
-    speed_ratio_queue.put(1.0)
-    speed_queue = queue.Queue()
-    speed_queue.put(initial_speed)
-    distance_queue = queue.Queue()
-    distance_queue.put(0.0)
-    ghost_gap_queue = queue.Queue()
-    exit_signal = queue.Queue()  # 🆕 Added for graceful exit
+    speed_ratio_queue = asyncio.Queue()
+    await speed_ratio_queue.put(1.0)
+    speed_queue = asyncio.Queue()
+    await speed_queue.put(initial_speed)
+    distance_queue = asyncio.Queue()
+    await distance_queue.put(0.0)
+    elapsed_time_queue = asyncio.Queue()
+    ghost_gap_queue = asyncio.Queue()
+    exit_signal = asyncio.Queue()
 
     start_time = datetime.utcnow()
     workout_data = []
@@ -73,13 +74,19 @@ async def exercise_routine(initial_speed, routine, video_path):
 
     start_tcx_file(start_time)
 
+    loop = asyncio.get_event_loop()
+    last_logged_distance = None  # <-- initialize here for throttling
+
     def callback(sender, data):
-        speed, distance, incline = parse_treadmill_data(data)
-        print(f"Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %")
-        speed_ratio = speed / initial_speed if initial_speed > 0 else 1.0
-        speed_ratio_queue.put(speed_ratio)
-        speed_queue.put(speed)
-        distance_queue.put(distance)
+        nonlocal last_logged_distance  # make sure to access outer variable
+
+        speed, distance, incline, elapsed_time = parse_treadmill_data(data)
+        print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline if incline is not None else 0:.2f} %, Time: {elapsed_time:.1f}s")
+
+        loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
+        loop.call_soon_threadsafe(speed_queue.put_nowait, speed)
+        loop.call_soon_threadsafe(distance_queue.put_nowait, distance)
+        loop.call_soon_threadsafe(elapsed_time_queue.put_nowait, elapsed_time)
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
@@ -90,7 +97,6 @@ async def exercise_routine(initial_speed, routine, video_path):
             "incline": incline
         })
 
-        # Check PBs every 10 samples
         if len(workout_data) % 10 == 0:
             try:
                 with open("user_config.json", "r") as f:
@@ -102,30 +108,67 @@ async def exercise_routine(initial_speed, routine, video_path):
 
         elapsed = (timestamp - start_time).total_seconds()
         user_distance_m = distance * 1000
-        ghost_gaps = {}
-        for ghost in ghost_runners:
-            ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
-            gap = user_distance_m - ghost_distance_m
-            ghost_gaps[ghost["name"]] = gap
-            #print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
-        ghost_gap_queue.put(ghost_gaps)
 
+        # Throttle ghost gap updates by rounding distance to 0.1m granularity
+        distance_rounded = round(user_distance_m, 1)
+
+        if last_logged_distance != distance_rounded:
+            last_logged_distance = distance_rounded
+            ghost_gaps = {}
+            for ghost in ghost_runners:
+                ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
+                gap = user_distance_m - ghost_distance_m
+                ghost_gaps[ghost["name"]] = gap
+            loop.call_soon_threadsafe(ghost_gap_queue.put_nowait, ghost_gaps)
+
+    print("[INFO] Starting treadmill monitoring...")
     await treadmill.start_monitoring(callback)
 
+    print("[INFO] Launching video task...")
     video_task = asyncio.create_task(
-        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue, exit_signal)  # 🆕 pass exit_signal
+        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue, exit_signal)
     )
 
     try:
-        for duration, speed_increment in routine:
+        print("[INFO] Starting routine segments...")
+        for idx, (duration, speed_increment) in enumerate(routine):
+            print(f"[SEGMENT {idx}] Setting speed to {speed_increment:.2f} km/h for {duration:.1f} min")
             await treadmill.set_speed(speed_increment)
-            for _ in range(int(duration * 60)):
-                await asyncio.sleep(1)
+
+            print("[SEGMENT] Waiting for treadmill-reported segment start time...")
+            try:
+                segment_start_time = await asyncio.wait_for(elapsed_time_queue.get(), timeout=10)
+                print(f"[SEGMENT] Segment started at treadmill time: {segment_start_time}s")
+            except asyncio.TimeoutError:
+                print("[ERROR] Timeout waiting for elapsed_time_queue (start of segment)")
+                break
+
+            target_time = segment_start_time + duration * 60
+            print(f"[SEGMENT] Target end time: {target_time}s")
+
+            while True:
+                await asyncio.sleep(0.2)
+
+                try:
+                    current_time = await asyncio.wait_for(elapsed_time_queue.get(), timeout=2)
+                except asyncio.TimeoutError:
+                    print("[WARN] Waiting for treadmill time update...")
+                    continue
+
+                print(f"[SEGMENT] Current treadmill time: {current_time:.1f}s / Target: {target_time:.1f}s")
+
                 if not exit_signal.empty():
+                    print("[INFO] User exit detected.")
                     raise asyncio.CancelledError("User requested exit")
+
+                if current_time >= target_time:
+                    print("[SEGMENT] Segment complete.")
+                    break
+
     except asyncio.CancelledError:
-        print("Workout interrupted by user.")
+        print("[INFO] Workout interrupted by user.")
     finally:
+        print("[INFO] Cleaning up...")
         await treadmill.stop_monitoring()
         await treadmill.disconnect()
         await video_task
@@ -134,6 +177,7 @@ async def exercise_routine(initial_speed, routine, video_path):
         final_distance = workout_data[-1]["distance"] if workout_data else 0.0
         finalize_tcx_file(start_time, end_time, final_distance)
 
+        print("[INFO] Workout complete.")
         return {
             "start_time": start_time,
             "end_time": end_time,

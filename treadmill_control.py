@@ -1,6 +1,7 @@
 # treadmill_control.py
 import asyncio
 import platform
+import time
 from bleak import BleakScanner, BleakClient
 
 ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
@@ -10,17 +11,16 @@ treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
 class TreadmillControl:
     def __init__(self, testing=None):
         self.client = None
-        if testing is None:
-            self.testing = platform.system() == "Windows"
-        else:
-            self.testing = testing
+        self.testing = platform.system() == "Windows" if testing is None else testing
         self.current_speed = 0.0
-        
+        self.start_time = None
+        self.simulated_distance = 0.0
 
     async def connect(self, target_name=None, target_address=None):
         if self.testing:
             print("Simulated connection to treadmill.")
-            self.client = "SimulatedClient"  # Mock client to indicate connection
+            self.client = "SimulatedClient"
+            self.start_time = time.time()
             return
 
         for attempt in range(6):
@@ -32,19 +32,14 @@ class TreadmillControl:
                 for device, adv_data in devices.values():
                     print(f"- {device.name or 'Unknown'} ({device.address})")
 
-                    # Priority 1: FTMS service
                     if ftms_service_uuid in adv_data.service_uuids:
                         treadmill = device
                         print("Found FTMS treadmill.")
                         break
-
-                    # Priority 2: Match by name
                     if target_name and device.name == target_name:
                         treadmill = device
                         print(f"Matched treadmill by name: {target_name}")
                         break
-
-                    # Priority 3: Match by MAC address
                     if target_address and device.address.lower() == target_address.lower():
                         treadmill = device
                         print(f"Matched treadmill by address: {target_address}")
@@ -62,7 +57,6 @@ class TreadmillControl:
                 await asyncio.sleep(2)
 
         raise Exception("Failed to connect after 3 attempts.")
-
 
     async def disconnect(self):
         if self.testing:
@@ -115,21 +109,42 @@ class TreadmillControl:
                 print(f"Operation {request_op_code} failed with result code {result_code}")
 
         await self.client.start_notify(control_point_uuid, handle_response)
-        await asyncio.sleep(1)  # Wait for the response
+        await asyncio.sleep(1)
         await self.client.stop_notify(control_point_uuid)
 
     async def start_monitoring(self, callback):
         if self.testing:
             print("Simulated start monitoring.")
-            # Simulate data
+            if self.start_time is None:
+                self.start_time = time.time()
+            self.simulated_distance = 0.0  # Reset distance on start
+
             async def simulate_data():
                 while True:
-                    speed_value = int(self.current_speed * 100).to_bytes(2, byteorder='little')
-                    data = bytearray([0x08, 0x00]) + speed_value + bytearray([0x00, 0x00, 0x00, 0x00, 0x0A, 0x00])
+                    elapsed_time = time.time() - self.start_time
+                    self.simulated_distance += (self.current_speed / 3600)  # km per sec
+
+                    distance_int = round(self.simulated_distance * 1000 / 10) * 10
+                    speed_int = int(self.current_speed * 100)
+                    elapsed_int = int(elapsed_time)
+
+                    # 🛠 Proper flags for speed, distance, and time (0x09)
+                    data = bytearray([
+                        0x09, 0x00,
+                        speed_int & 0xFF, speed_int >> 8,
+                        distance_int & 0xFF, (distance_int >> 8) & 0xFF, (distance_int >> 16) & 0xFF,
+                        elapsed_int & 0xFF, (elapsed_int >> 8) & 0xFF, (elapsed_int >> 16) & 0xFF
+                    ])
+
+                    print(f"[Sim] Speed: {self.current_speed:.2f} km/h, Distance: {self.simulated_distance:.3f} km, Elapsed: {int(elapsed_time)}s")
                     callback(None, data)
+
                     await asyncio.sleep(1)
+
             asyncio.create_task(simulate_data())
             return
+
+
         if self.client:
             await self.client.start_notify(treadmill_data_uuid, callback)
 
@@ -149,8 +164,11 @@ class TreadmillControl:
 def parse_treadmill_data(data):
     flags = data[0]
     speed = int.from_bytes(data[2:4], byteorder='little') / 100.0
-    distance = int.from_bytes(data[4:7], byteorder='little') /1000
+    distance = int.from_bytes(data[4:7], byteorder='little') / 1000.0
+    elapsed_time = int.from_bytes(data[7:10], byteorder='little') if len(data) >= 10 else 0
+
     incline = None
-    if flags & 0x08:  # Check if Inclination and Ramp Angle Setting Present bit is set
-        incline = int.from_bytes(data[7:9], byteorder='little', signed=True) / 10.0
-    return speed, distance, incline
+    if flags & 0x08 and len(data) >= 12:
+        incline = int.from_bytes(data[10:12], byteorder='little', signed=True) / 10.0
+
+    return speed, distance, incline, elapsed_time

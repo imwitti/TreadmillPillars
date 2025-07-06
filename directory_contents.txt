@@ -35,10 +35,12 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 34/
         [Folder] 3b/
         [Folder] 3d/
+        [Folder] 3f/
         [Folder] 40/
         [Folder] 48/
         [Folder] 49/
         [Folder] 4b/
+        [Folder] 4d/
         [Folder] 4e/
         [Folder] 53/
         [Folder] 54/
@@ -49,11 +51,13 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 5f/
         [Folder] 61/
         [Folder] 62/
+        [Folder] 64/
         [Folder] 67/
         [Folder] 68/
         [Folder] 69/
         [Folder] 6a/
         [Folder] 6b/
+        [Folder] 6c/
         [Folder] 6d/
         [Folder] 6e/
         [Folder] 6f/
@@ -63,6 +67,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 78/
         [Folder] 7d/
         [Folder] 7e/
+        [Folder] 80/
         [Folder] 81/
         [Folder] 83/
         [Folder] 86/
@@ -70,10 +75,12 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 8c/
         [Folder] 8f/
         [Folder] 90/
+        [Folder] 91/
         [Folder] 92/
         [Folder] 93/
         [Folder] 95/
         [Folder] 96/
+        [Folder] 97/
         [Folder] 9d/
         [Folder] 9e/
         [Folder] a1/
@@ -94,8 +101,10 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] c7/
         [Folder] c9/
         [Folder] ca/
+        [Folder] cb/
         [Folder] d1/
         [Folder] d6/
+        [Folder] d8/
         [Folder] d9/
         [Folder] db/
         [Folder] df/
@@ -103,12 +112,15 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] e1/
         [Folder] e4/
         [Folder] e6/
+        [Folder] e7/
+        [Folder] e8/
         [Folder] e9/
         [Folder] ea/
         [Folder] ec/
         [Folder] ee/
         [Folder] f0/
         [Folder] f2/
+        [Folder] f3/
         [Folder] f6/
         [Folder] f9/
         [Folder] fd/
@@ -167,6 +179,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
 import sys
 import asyncio
 import pygame
+import platform
 import json
 import os
 import subprocess
@@ -185,6 +198,12 @@ pygame.init()
 screen = pygame.display.set_mode((800, 600), pygame.FULLSCREEN)
 pygame.display.set_caption("Routine Selector")
 font = pygame.font.Font(None, FONT_SIZE)
+
+def disable_screensaver():
+    if platform.system() == "Linux":
+        os.system("xset s off")
+        os.system("xset -dpms")
+        os.system("xset s noblank")
 
 
 def load_user_config(config_path='user_config.json'):
@@ -206,7 +225,7 @@ def load_routines(file_path):
 def list_videos(video_folder):
     videos = []
     for file in os.listdir(video_folder):
-        if file.lower().endswith('.mp4'):
+        if file.lower().endswith(('.mp4','.avi')):
             name, speed, distance = parse_video_title(file)
             videos.append((file, name, float(speed), float(distance)))
     return videos
@@ -270,6 +289,7 @@ def show_status(screen, font, message):
 
 
 async def main():
+    disable_screensaver()
     user_config = load_user_config()
     pb_times = user_config.get("pb_times_minutes", {})
     display_pb_times(screen, font, pb_times)
@@ -1183,7 +1203,7 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
 [File] routines.json
 --- Start of routines.json ---
 {
-    "p1": [
+    "Basic_pillars": [
         [5, 0],
         [5, 0.5],
         [4, 0],
@@ -1208,6 +1228,19 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
         [2, 2.5],
         [1, 0],
         [2, 3]
+    ],
+    "Pillars_Buffer": [
+        [3.5, 0.5],
+        [5, 0.0],
+        [5, 0.5],
+        [4, 0],
+        [4, 1.0],
+        [3, 0],
+        [3, 1.5],
+        [2, 0],
+        [2, 2.0],
+        [1, 0],
+        [1, 2.5]
     ]
 }
 --- End of routines.json ---
@@ -1493,7 +1526,7 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         hud_speed_text = f"{last_known_speed:.1f} km/h"
         cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        hud_distance_text = f"{last_known_distance:.0f} km"
+        hud_distance_text = f"{last_known_distance:.2f} km"
         (text_width, text_height), _ = cv2.getTextSize(hud_distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         cv2.putText(frame, hud_distance_text, (frame.shape[1] - text_width - 10, text_height + 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -1562,7 +1595,7 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         Generates a thumbnail image for a given .mp4 video file at a specified timestamp.
         """
         video_file = Path(video_path)
-        if not video_file.is_file() or video_file.suffix.lower() != '.mp4':
+        if not video_file.is_file() or video_file.suffix.lower() not in ['.mp4', '.avi']:
             print(f"Invalid .mp4 file: {video_path}")
             return
     
@@ -1598,12 +1631,12 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
     
     if __name__ == "__main__":
         current_dir = Path(".")
-        mp4_files = list(current_dir.glob("*.mp4"))
+        video_files = list(current_dir.glob("*.mp4")) + list(current_dir.glob("*.avi"))
     
-        if not mp4_files:
+        if not video_files:
             print("No .mp4 files found in the current directory.")
         else:
-            for video_file in mp4_files:
+            for video_file in video_files:
                 generate_video_thumbnail(video_file)
     --- End of video_thumbnails.py ---
 

@@ -1,3 +1,8 @@
+Started well problem one the orange pie keeps logging out putting the screensaver on during the run and I have to get the keyboard to log back in to see my run problem too. The changes of the treadmill did not align to the times sit in the routine. something must be going straight Astray problem three as I progressed through the run the video became slower and slower. Obviously we are loading more and more data for some reason that is slowing the whole thing down probably as we record an array of the entire fitness data instead of just logging it as we go For I recommend we use the time from the treadmill as the time and use it to identify Change items in the routine otherwise this long leg and frames may also cause a lag and change of the routine problem. Five my distance only changes every two decimal places from the treadmill but the distance of the ghosts has more dynamic so they keep jumping in front further in front and then jump back behind as my treadmill distance changes versus their distance. They should both be updated only when treadmill distance changes.
+
+5k he equals 35.49
+Frame stalled on 3.63 distance and 29.25 time controller is no longer working
+
 Here’s a **detailed, structured list** of all the changes you’ll need to make to your app to support:
 
 1. **Routines that run by either time or distance**, and  
@@ -5,7 +10,98 @@ Here’s a **detailed, structured list** of all the changes you’ll need to mak
 
 This list is organized by **intent**, **file**, and **specific change details**, so you can use it as a blueprint for implementation or to guide an LLM like GitHub Copilot.
 
----
+
+2. Treadmill speed changes don’t match routine timing
+Problem: Speed changes happen every second in a loop, not based on actual treadmill time.
+
+Cause: Your loop waits await asyncio.sleep(1) for each second of duration, but if system is lagging (due to heavy load), this drifts from actual elapsed time.
+
+Fix:
+Replace per-second sleeps with a loop that checks actual treadmill time, like this in RunRoutine.py:
+
+python
+Copy
+Edit
+target_distance = 0.0
+for duration, speed_increment in routine:
+    await treadmill.set_speed(speed_increment)
+    segment_start_distance = distance_queue.get()
+    target_distance += speed_increment * (duration / 60)  # km
+
+    while True:
+        await asyncio.sleep(0.2)
+        current_distance = distance_queue.get()
+        if current_distance - segment_start_distance >= speed_increment * (duration / 60):
+            break
+Or track based on treadmill distance, not time (preferred).
+
+3. Video slows down over time
+Problem: App gets slower during the run.
+
+Cause: workout_data grows over time, but you’re storing every sample in memory and writing incrementally to disk each second (append_tcx_trackpoint and ghost gap calcs).
+
+Fix:
+
+Stop recalculating PBs and ghost gaps every 10 samples.
+
+Instead, store only the latest data point in memory and append to file in batch after the workout.
+
+For real-time processing, limit workout_data to the last N seconds:
+
+python
+Copy
+Edit
+if len(workout_data) > 600:  # keep only last 10 minutes
+    workout_data.pop(0)
+4. Routine advancement tied to wall-clock time, not treadmill
+Problem: Routine steps advance by system time, which drifts from treadmill time.
+
+Fix:
+
+As in (2), use treadmill distance or treadmill-supplied time if available.
+
+Example (based on distance instead of sleep loop):
+
+python
+Copy
+Edit
+segment_start_distance = last_known_distance
+target_distance = segment_start_distance + (duration * speed_increment / 60.0)
+
+while True:
+    await asyncio.sleep(0.2)
+    current_distance = distance_queue.get()
+    if current_distance >= target_distance:
+        break
+5. Ghost runner positions jump around
+Problem: Treadmill distance updates only every 0.01 km (10m), but ghosts update per frame.
+
+Fix:
+Update ghost logic only when treadmill distance changes, like this:
+
+python
+Copy
+Edit
+# In callback or ghost update:
+if distance != last_logged_distance:
+    last_logged_distance = distance
+    ghost_gap_queue.put(ghost_gaps)
+Recommended Priority Fix Order:
+Fix the screensaver to avoid run interruptions.
+
+Base routine logic on treadmill distance, not time or sleep().
+
+Throttle ghost update frequency to match treadmill distance updates.
+
+Cap memory usage by limiting workout_data size.
+
+Optimize video HUD frame draw, but that may not be urgent if (3) and (4) are fixed.
+
+
+
+
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 ## ✅ 1. Support Time- or Distance-Based Routines
 
