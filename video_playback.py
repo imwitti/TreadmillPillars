@@ -44,7 +44,7 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         hud_speed_text = f"{last_known_speed:.1f} km/h"
         cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        hud_distance_text = f"{last_known_distance:.0f} km"
+        hud_distance_text = f"{last_known_distance:.2f} km"
         (text_width, text_height), _ = cv2.getTextSize(hud_distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         cv2.putText(frame, hud_distance_text, (frame.shape[1] - text_width - 10, text_height + 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)

@@ -10,6 +10,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
                 [Folder] origin/
     [Folder] objects/
         [Folder] 01/
+        [Folder] 02/
         [Folder] 05/
         [Folder] 06/
         [Folder] 09/
@@ -67,6 +68,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 86/
         [Folder] 8a/
         [Folder] 8c/
+        [Folder] 8f/
         [Folder] 90/
         [Folder] 92/
         [Folder] 93/
@@ -83,12 +85,14 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] af/
         [Folder] b5/
         [Folder] b7/
+        [Folder] ba/
         [Folder] bd/
         [Folder] c0/
         [Folder] c2/
         [Folder] c3/
         [Folder] c6/
         [Folder] c7/
+        [Folder] c9/
         [Folder] ca/
         [Folder] d1/
         [Folder] d6/
@@ -96,14 +100,18 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] db/
         [Folder] df/
         [Folder] e0/
+        [Folder] e1/
         [Folder] e4/
         [Folder] e6/
         [Folder] e9/
         [Folder] ea/
+        [Folder] ec/
         [Folder] ee/
         [Folder] f0/
         [Folder] f2/
+        [Folder] f6/
         [Folder] f9/
+        [Folder] fd/
         [Folder] fe/
         [Folder] info/
         [Folder] pack/
@@ -113,6 +121,46 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
             [Folder] origin/
         [Folder] tags/
 [Folder] Ancillaries/
+    [File] shrinkvideos.py
+    --- Start of shrinkvideos.py ---
+    import cv2
+    
+    def convert_video(input_path, output_path, width=640, height=380, codec='MJPG', fps=30):
+        # Open the input video
+        cap = cv2.VideoCapture(input_path)
+        if not cap.isOpened():
+            print("Error: Cannot open the video file.")
+            return
+    
+        # Get the original frame rate if available
+        original_fps = cap.get(cv2.CAP_PROP_FPS)
+        if original_fps > 0:
+            fps = min(fps, original_fps)
+    
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+    
+            # Resize the frame
+            resized_frame = cv2.resize(frame, (width, height))
+    
+            # Write the frame to the output video
+            out.write(resized_frame)
+    
+        # Release everything
+        cap.release()
+        out.release()
+        print(f"Video conversion complete. Saved to {output_path}")
+    
+    # Example usage:
+    convert_video('forestrun_8.33_5.0.mp4', 'forestrun_8.33_5.0.avi')
+    --- End of shrinkvideos.py ---
+
 [Folder] Animations/
 [File] RoutineSender.py
 --- Start of RoutineSender.py ---
@@ -241,7 +289,8 @@ async def main():
     videos = list_videos('videos')
     video_data = [(v[0], f"{v[1].capitalize()} ({v[2]} km/h {v[3]}km)") for v in videos]
 
-    routine_name, video_path, selected_speed = run_selection_ui(screen, routines, video_data, zwo_speed)
+    routine_name, video_path, selected_speed = run_selection_ui(screen, routines, video_data, zwo_speed, pb_times=pb_times)
+
     if not all([routine_name, video_path, selected_speed]):
         pygame.quit()
         return
@@ -599,6 +648,7 @@ if __name__ == "__main__":
 --- Start of menu_ui.py ---
 import pygame
 from pathlib import Path
+import math
 import os
 
 # Colors
@@ -647,8 +697,48 @@ def draw_vertical_gradient(surface, color_start, color_end):
         b = int(color_start[2] * (1 - ratio) + color_end[2] * ratio)
         pygame.draw.line(surface, (r, g, b), (0, y), (surface.get_width(), y))
 
-def run_selection_ui(screen, routines, videos, start_speed=8.5):
+def run_selection_ui(screen, routines, videos, start_speed=8.5, pb_times=None):
+    import pygame
+    from pathlib import Path
+    import os
+
+    # Colors
+    WHITE = (255, 255, 255)
+    BLACK = (20, 20, 20)
+    HIGHLIGHT = (50, 200, 255)
+    LIGHT_HIGHLIGHT = (80, 120, 160)
+    SHADOW = (10, 10, 10)
+    GOLD = (255, 215, 0)
+
+    # Sizes
+    FONT_SIZE = 18
+    TITLE_FONT_SIZE = 12
+    THUMBNAIL_SIZE = (140, 100)
+    SPEED_THUMBNAIL_SIZE = (120, 15)
+    ITEM_SPACING = 160
+    CAROUSEL_Y_POSITIONS = [120, 280, 420]
+    START_BUTTON_Y = 500
+
+    def load_fonts():
+        fonts = {}
+        fonts['regular'] = pygame.font.Font("fonts/Roboto-Regular.ttf", FONT_SIZE)
+        fonts['bold'] = pygame.font.Font("fonts/Roboto-Bold.ttf", FONT_SIZE)
+        fonts['title'] = pygame.font.Font("fonts/Roboto-Bold.ttf", TITLE_FONT_SIZE)
+        fonts['start'] = pygame.font.Font("fonts/Roboto-Bold.ttf", 24)
+        return fonts
+
+    def load_thumbnail(path, size=THUMBNAIL_SIZE):
+        p = Path(path)
+        if not p.exists():
+            return None
+        try:
+            img = pygame.image.load(str(p)).convert_alpha()
+            return pygame.transform.smoothscale(img, size)
+        except Exception:
+            return None
+
     fonts = load_fonts()
+    pb_times = pb_times or {}
 
     routine_names = list(routines.keys())
     routine_thumbs = [load_thumbnail(f"routines/{name}.png") for name in routine_names]
@@ -668,7 +758,6 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5):
     clock = pygame.time.Clock()
     running = True
 
-    # Load and scale background image
     background_path = "assets/background.jpg"
     background_img = pygame.image.load(background_path).convert()
     background_img = pygame.transform.scale(background_img, screen.get_size())
@@ -728,6 +817,27 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5):
                     alpha = 180 if is_focused else 100
                     highlight_surf.fill((*highlight_color, alpha))
                     screen.blit(highlight_surf, (x - thumb_size[0] // 2 - 10, y - thumb_size[1] // 2 - 10))
+
+                # PB Highlighting
+                if carousel_i == 2:
+                    selected_routine = routines[routine_names[selections[0]]]
+                    total_duration = sum(d for d, _ in selected_routine)
+                    increments = [inc for _, inc in selected_routine]
+                    avg_increment = sum(increments) / len(increments) if increments else 0
+
+                    for dist_str, pb_time in pb_times.items():
+                        try:
+                            dist_km = float(dist_str)
+                            pb_speed = dist_km / (pb_time / 60)
+                            import math
+                            base_speed = math.ceil((pb_speed - avg_increment) * 10) / 10
+
+                            if abs(speeds[idx] - base_speed) < 0.1:
+                                pygame.draw.circle(screen, GOLD, (x, y), thumb_size[1] // 2 + 10, 3)
+                                label = fonts['title'].render(f"🏅 {dist_str}k PB", True, GOLD)
+                                screen.blit(label, label.get_rect(center=(x, y - 25)))
+                        except Exception:
+                            continue
 
                 if carousel_i != 2 and thumbs[idx]:
                     thumb_rect = thumbs[idx].get_rect(center=(x, y))

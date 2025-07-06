@@ -6,7 +6,7 @@ def generate_video_thumbnail(video_path, timestamp=1.0):
     Generates a thumbnail image for a given .mp4 video file at a specified timestamp.
     """
     video_file = Path(video_path)
-    if not video_file.is_file() or video_file.suffix.lower() != '.mp4':
+    if not video_file.is_file() or video_file.suffix.lower() not in ['.mp4', '.avi']:
         print(f"Invalid .mp4 file: {video_path}")
         return
 
@@ -42,10 +42,10 @@ def generate_video_thumbnail(video_path, timestamp=1.0):
 
 if __name__ == "__main__":
     current_dir = Path(".")
-    mp4_files = list(current_dir.glob("*.mp4"))
+    video_files = list(current_dir.glob("*.mp4")) + list(current_dir.glob("*.avi"))
 
-    if not mp4_files:
+    if not video_files:
         print("No .mp4 files found in the current directory.")
     else:
-        for video_file in mp4_files:
+        for video_file in video_files:
             generate_video_thumbnail(video_file)

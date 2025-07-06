@@ -1,0 +1,278 @@
+Here’s a **detailed, structured list** of all the changes you’ll need to make to your app to support:
+
+1. **Routines that run by either time or distance**, and  
+2. **Incline control either from the routine or from a separate video-aligned incline file**.
+
+This list is organized by **intent**, **file**, and **specific change details**, so you can use it as a blueprint for implementation or to guide an LLM like GitHub Copilot.
+
+---
+
+## ✅ 1. Support Time- or Distance-Based Routines
+
+### 🔧 Intent
+Allow routines to specify whether each segment is based on **time** or **distance**, and execute accordingly.
+
+---
+
+### 📄 `zwo_parser.py`
+
+#### 🔹 Change: Extend ZWO parsing to detect `<durationType>`
+- **What to do**:
+  - In `parse_zwo_file()`, for each workout block, check for a `<durationType>` child or attribute.
+  - Default to `"time"` if not specified.
+  - Return each segment as a tuple: `("time" or "distance", value, speed_increment)`.
+
+#### 🔹 Example:
+```python
+routine.append(("distance", 1000, speed_increment))  # 1 km
+routine.append(("time", 5, speed_increment))         # 5 minutes
+```
+
+---
+
+### 📄 `routines.json` (and JSON routine handling)
+
+#### 🔹 Change: Update format to include type
+- **What to do**:
+  - Change each routine step from `[duration, increment]` to `["time" or "distance", value, increment]`.
+
+#### 🔹 Update parser in `RoutineSender.py` or `generate_zwo_thumbnail.py`:
+- Modify `load_routines()` and `parse_json_config()` to handle the new format.
+
+---
+
+### 📄 `RunRoutine.py`
+
+#### 🔹 Change: Update `exercise_routine()` to handle both types
+- **What to do**:
+  - For `"time"` segments: run for `duration * 60` seconds.
+  - For `"distance"` segments: monitor treadmill distance and run until the delta reaches the target.
+
+#### 🔹 Add:
+- Track distance at the start of each `"distance"` segment.
+- Use treadmill’s real-time distance data to determine when to move to the next segment.
+
+---
+
+## ✅ 2. Support Incline Control from Routine or Video-Aligned File
+
+### 🔧 Intent
+Allow incline to be:
+- Defined per segment in the routine, or
+- Loaded from a separate file that maps incline to video frame/time.
+
+---
+
+### 📄 `zwo_parser.py` and `routines.json`
+
+#### 🔹 Change: Add incline to routine segments
+- **What to do**:
+  - In ZWO: extract `Cadence` or custom `<incline>` tag if present.
+  - In JSON: allow optional 4th value: `["time", 5, 0.5, 2.0]` → 5 min, +0.5 km/h, 2% incline.
+
+---
+
+### 📄 `RunRoutine.py`
+
+#### 🔹 Change: Apply incline per segment
+- **What to do**:
+  - If incline is specified in the segment, call `await treadmill.set_incline(incline)` before starting it.
+
+---
+
+### 📄 New File: `video_incline_profiles.json` (or similar)
+
+#### 🔹 Format:
+```json
+{
+  "video1.mp4": {
+    "0": 1.0,
+    "60": 1.5,
+    "120": 2.0
+  }
+}
+```
+- Keys are seconds (or frame numbers), values are incline percentages.
+
+---
+
+### 📄 `RunRoutine.py` or `video_playback.py`
+
+#### 🔹 Change: Load incline profile for selected video
+- **What to do**:
+  - Load incline profile based on selected video.
+  - In the main loop, check elapsed time and apply incline if it changes.
+
+---
+
+### 📄 `RoutineSender.py`
+
+#### 🔹 Change: Load incline profile file
+- **What to do**:
+  - When loading video, also load matching incline profile (if available).
+  - Pass it to `exercise_routine()`.
+
+---
+
+## ✅ 3. Optional: UI and Display Enhancements
+
+### 📄 `menu_ui.py`
+
+#### 🔹 Change: Show routine type and incline info
+- **What to do**:
+  - Display whether a routine is time- or distance-based.
+  - Show incline info if available.
+
+---
+
+## ✅ 4. Testing and Validation
+
+### 📄 `test_routines.py` (if exists or create one)
+
+#### 🔹 Add tests for:
+- Mixed time/distance routines.
+- Incline from routine vs video.
+- Fallbacks when incline is missing.
+
+---
+
+## ✅ Summary Table
+
+| Intent | File | Change |
+|--------|------|--------|
+| Support time/distance | `zwo_parser.py` | Parse `<durationType>` |
+| 〃 | `routines.json` | Add type to each step |
+| 〃 | `RunRoutine.py` | Handle both types in loop |
+| Incline from routine | `zwo_parser.py`, `routines.json` | Add incline to steps |
+| Incline from video | New JSON file | Map time/frame to incline |
+| 〃 | `RunRoutine.py` | Apply incline during playback |
+| UI support | `menu_ui.py` | Show type/incline info |
+
+---
+
+Would you like me to generate a sample updated routine format or a code snippet for one of these changes to get you started?
+
+Yes — you can absolutely restructure your `RunRoutine.py` logic to make it **modular, extensible, and safer for incremental feature additions**. This is especially important when introducing new features like:
+
+- Time vs distance-based intervals
+- Multiple incline control sources
+- Future enhancements (e.g., heart rate zones, music sync, etc.)
+
+Here’s a **recommended structural refactor** that will let you add features **one by one** without breaking the app.
+
+---
+
+## ✅ High-Level Strategy
+
+### 🔄 Refactor `RunRoutine.py` into:
+1. **Core routine runner** (e.g. `routine_engine.py`)
+2. **Segment execution logic** (e.g. `segment_executor.py`)
+3. **Incline controller** (e.g. `incline_controller.py`)
+4. **Data models** (e.g. `models.py` or inline `@dataclass`es)
+
+This separation allows you to:
+- Add new segment types (e.g. distance) without touching the main loop.
+- Swap incline sources (routine vs video) with a plug-and-play controller.
+- Keep `RunRoutine.py` as a clean orchestrator.
+
+---
+
+## 🧱 Suggested File Structure and Responsibilities
+
+| File | Purpose |
+|------|---------|
+| `RunRoutine.py` | High-level orchestration: load config, start treadmill, call runner |
+| `routine_engine.py` | Main loop: iterate over segments, call executor |
+| `segment_executor.py` | Executes a single segment (time or distance) |
+| `incline_controller.py` | Determines incline at any moment (from routine or video) |
+| `models.py` | Define `RoutineSegment`, `InclineProfile`, etc. |
+
+---
+
+## 🧩 Modular Components
+
+### 1. `models.py`
+
+```python
+from dataclasses import dataclass
+from typing import Literal, Optional
+
+@dataclass
+class RoutineSegment:
+    mode: Literal["time", "distance"]
+    value: float  # minutes or meters
+    speed_increment: float
+    incline: Optional[float] = None
+```
+
+---
+
+### 2. `segment_executor.py`
+
+```python
+async def execute_segment(treadmill, segment: RoutineSegment, current_speed, get_distance):
+    if segment.incline is not None:
+        await treadmill.set_incline(segment.incline)
+
+    await treadmill.set_speed(current_speed + segment.speed_increment)
+
+    if segment.mode == "time":
+        for _ in range(int(segment.value * 60)):
+            await asyncio.sleep(1)
+    elif segment.mode == "distance":
+        start_distance = get_distance()
+        while get_distance() - start_distance < segment.value:
+            await asyncio.sleep(0.5)
+```
+
+---
+
+### 3. `incline_controller.py`
+
+```python
+class InclineController:
+    def __init__(self, routine=None, video_profile=None):
+        self.routine = routine
+        self.video_profile = video_profile
+
+    def get_incline(self, segment_index, elapsed_time):
+        if self.video_profile:
+            return self.video_profile.get(int(elapsed_time), None)
+        elif self.routine:
+            return self.routine[segment_index].incline
+        return None
+```
+
+---
+
+### 4. `routine_engine.py`
+
+```python
+from segment_executor import execute_segment
+
+async def run_routine(treadmill, routine_segments, initial_speed, get_distance, incline_controller):
+    for i, segment in enumerate(routine_segments):
+        incline = incline_controller.get_incline(i, elapsed_time=0)  # or pass actual time
+        segment.incline = incline
+        await execute_segment(treadmill, segment, initial_speed, get_distance)
+```
+
+---
+
+### 5. `RunRoutine.py`
+
+- Load routine (ZWO or JSON)
+- Convert to `RoutineSegment` list
+- Load incline profile (if any)
+- Call `run_routine(...)`
+
+---
+
+## ✅ Benefits of This Structure
+
+- **Safe incremental development**: Add new segment types or incline sources without breaking the rest.
+- **Testable**: You can unit test `execute_segment()` or `InclineController` in isolation.
+- **Readable**: Each file has a single responsibility.
+- **Future-proof**: Easy to add heart rate zones, music sync, etc.
+
+---

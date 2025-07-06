@@ -40,7 +40,7 @@ def load_routines(file_path):
 def list_videos(video_folder):
     videos = []
     for file in os.listdir(video_folder):
-        if file.lower().endswith('.mp4'):
+        if file.lower().endswith(('.mp4','.avi')):
             name, speed, distance = parse_video_title(file)
             videos.append((file, name, float(speed), float(distance)))
     return videos
