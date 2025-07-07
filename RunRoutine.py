@@ -61,7 +61,17 @@ async def exercise_routine(initial_speed, routine, video_path):
         nonlocal last_logged_distance, last_distance
 
         speed, distance, incline, elapsed_time = parse_treadmill_data(data)
-        print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline if incline is not None else 0:.2f} %, Time: {elapsed_time:.1f}s")
+        if incline is None:
+            incline = 0.0
+        if speed is None:
+            speed = 0.0
+        if distance is None:
+            distance = 0.0
+        if elapsed_time is None:
+            elapsed_time = 0.0
+
+        print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %, Time: {elapsed_time:.1f}s")
+
 
         loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
         loop.call_soon_threadsafe(speed_queue.put_nowait, speed)

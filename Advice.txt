@@ -1,3 +1,190 @@
+✅ All Feature Goals (and Known Issues)
+Fix screensaver lockouts on Linux/Orange Pi.
+
+Replace time-based routine advancement with treadmill-based (distance or time from treadmill).
+
+Throttle ghost runner updates to match treadmill distance granularity (0.01 km).
+
+Cap workout_data memory usage to prevent app slowdown.
+
+Support time- or distance-based segments in routines.
+
+Support incline per segment (routine-specified or video-aligned).
+
+Add incline control based on video time using external JSON mapping.
+
+Refactor code to separate logic cleanly, supporting modular updates.
+
+Improve PB tracking efficiency by avoiding recalculation every 10 samples.
+
+Enhance UI to show segment type and incline info in menu.
+
+Add unit tests to verify support for mixed segment types and incline logic.
+
+Update PB's based on parsing the finished TCX 
+
+🧭 Execution Plan – Ordered for Stability
+Each step builds toward the final feature set without breaking existing functionality.
+
+### Step 1: 🔒 Fix Screensaver Lockouts
+Why First: Prevents system interruption during testing and use.
+
+What to Do:
+
+Already implemented in RoutineSender.py: disable_screensaver()
+
+✅ Just confirm this is working on Arch/Orange Pi at boot and after login.
+
+### Step 2: 📏 Switch Routine Advancement to Distance-Based
+Why Now: Fixes core timing issues and ghost sync.
+
+What to Do:
+
+In RunRoutine.py, modify the per-segment loop to:
+
+Record segment_start_distance = distance_queue.get()
+
+Calculate target_distance = segment_start_distance + speed * duration / 60
+
+Loop with await asyncio.sleep(0.2) until treadmill-reported distance >= target.
+
+✅ Keeps the structure but aligns timing to treadmill reality.
+
+### Step 3: 🧠 Throttle Ghost Updates
+Why: Fix ghost "jumpiness" and reduce CPU load.
+
+What to Do:
+
+In callback() in RunRoutine.py, only call ghost_gap_queue.put(...) if distance != last_logged_distance.
+
+### Step 4: 🧹 Cap workout_data Size
+Why: Prevent memory buildup and slowdown over long runs.
+
+What to Do:
+
+Add if len(workout_data) > 600: workout_data.pop(0) to the callback.
+
+Only keep 10 minutes of data in memory for real-time processing.
+
+### Step 5: 🪜 Refactor Segment Execution (Safe Refactor)
+Why: Enables new features like distance segments and incline without breaking the loop.
+
+What to Do:
+
+Move segment execution logic into segment_executor.py.
+
+Use a RoutineSegment dataclass in models.py:
+
+python
+Copy
+Edit
+@dataclass
+class RoutineSegment:
+    mode: str  # "time" or "distance"
+    value: float  # minutes or km
+    speed: float
+    incline: Optional[float] = None
+Modify RunRoutine.py to:
+
+Call execute_segment(segment, treadmill, distance_queue, ...) for each one.
+
+### Step 6: 🧬 Add Time/Distance Segment Type Support
+Why: Users can define routines by time or distance.
+
+What to Do:
+
+Modify:
+
+routines.json → Each step becomes ["distance", 1, 1.0] or ["time", 5, 0.5].
+
+load_routines() in RoutineSender.py
+
+generate_zwo_thumbnail.py to accept and render type and incline (optional)
+
+Update zwo_parser.py to infer "time" by default, or detect <durationType> if present.
+
+### Step 7: ⛰️ Add Incline to Routine Segments
+Why: Let users define incline manually.
+
+What to Do:
+
+Add 4th value to JSON: ["time", 5, 0.5, 1.5] → +0.5 speed, 1.5% incline
+
+In RunRoutine.py, if incline is provided, await treadmill.set_incline(incline) before segment loop.
+
+### Step 8: 🎥 Support Incline from Video Profile File
+Why: Sync incline with course terrain.
+
+What to Do:
+
+Add new file: video_incline_profiles.json:
+
+json
+Copy
+Edit
+{
+  "video1.mp4": { "0": 0.5, "60": 1.0, "120": 2.5 }
+}
+Load this mapping in RoutineSender.py and pass it to exercise_routine()
+
+In a separate async task or within play_video, monitor elapsed time and update treadmill incline at matching timepoints.
+
+### Step 9: 🪞 Improve UI to Show Segment Type and Incline
+Why: Show user what they’re selecting.
+
+What to Do:
+
+In menu_ui.py, update draw_... logic to include:
+
+"Time" or "Distance" icons
+
+Incline value if present
+
+Tooltip or text overlay is fine to start with.
+
+### Step 10: 🧪 Add Tests
+Why: Prevent regressions when refactoring or adding routines.
+
+What to Do:
+
+Create test_routines.py
+
+Add tests for:
+
+Parsing mixed segment types
+
+Handling of incline per segment
+
+Video-based incline fallback when missing
+
+Routine parsing from both JSON and ZWO
+
+### Step 11: ⚙️ Optimize PB Calculations
+Why: Avoid CPU spikes from recalculating every 10 samples.
+
+What to Do:
+
+Only recalculate PBs every 1 minute (or configurable N seconds).
+
+Use a last_pb_check = time.time() in callback()
+
+🧭 Summary Table
+Step	Goal	Safety Level
+1	Fix screensaver	✅ Already implemented
+2	Distance-based segments	✅ Small changes to loop
+3	Throttle ghost updates	✅ Local change
+4	Cap memory usage	✅ No user impact
+5	Refactor execution logic	⚠️ Requires tests
+6	Add distance/time support	⚠️ JSON format change
+7	Add incline per segment	⚠️ Backward compatibility
+8	Add incline from video	✅ Optional feature
+9	Improve UI	✅ Safe enhancement
+10	Add tests	✅ No impact on runtime
+11	Optimize PB checking	✅ Performance tweak
+
+Would you like to start executing these steps together, one at a time? I can help with each part modularly as you go.
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 Started well problem one the orange pie keeps logging out putting the screensaver on during the run and I have to get the keyboard to log back in to see my run problem too. The changes of the treadmill did not align to the times sit in the routine. something must be going straight Astray problem three as I progressed through the run the video became slower and slower. Obviously we are loading more and more data for some reason that is slowing the whole thing down probably as we record an array of the entire fitness data instead of just logging it as we go For I recommend we use the time from the treadmill as the time and use it to identify Change items in the routine otherwise this long leg and frames may also cause a lag and change of the routine problem. Five my distance only changes every two decimal places from the treadmill but the distance of the ghosts has more dynamic so they keep jumping in front further in front and then jump back behind as my treadmill distance changes versus their distance. They should both be updated only when treadmill distance changes.
 
 5k he equals 35.49

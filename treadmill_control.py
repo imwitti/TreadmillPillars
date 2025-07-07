@@ -128,9 +128,10 @@ class TreadmillControl:
                     speed_int = int(self.current_speed * 100)
                     elapsed_int = int(elapsed_time)
 
-                    # 🛠 Proper flags for speed, distance, and time (0x09)
+                    # Flags: bits 0, 2, 10 → Speed, Distance, Elapsed Time
+                    flags = 0b0000010100000100
                     data = bytearray([
-                        0x09, 0x00,
+                        flags & 0xFF, (flags >> 8) & 0xFF,
                         speed_int & 0xFF, speed_int >> 8,
                         distance_int & 0xFF, (distance_int >> 8) & 0xFF, (distance_int >> 16) & 0xFF,
                         elapsed_int & 0xFF, (elapsed_int >> 8) & 0xFF, (elapsed_int >> 16) & 0xFF
@@ -143,7 +144,6 @@ class TreadmillControl:
 
             asyncio.create_task(simulate_data())
             return
-
 
         if self.client:
             await self.client.start_notify(treadmill_data_uuid, callback)
@@ -162,13 +162,28 @@ class TreadmillControl:
         await self.set_speed(self.current_speed - 0.5)
 
 def parse_treadmill_data(data):
-    flags = data[0]
-    speed = int.from_bytes(data[2:4], byteorder='little') / 100.0
-    distance = int.from_bytes(data[4:7], byteorder='little') / 1000.0
-    elapsed_time = int.from_bytes(data[7:10], byteorder='little') if len(data) >= 10 else 0
+    flags = int.from_bytes(data[0:2], byteorder='little')
+    idx = 2
 
-    incline = None
-    if flags & 0x08 and len(data) >= 12:
-        incline = int.from_bytes(data[10:12], byteorder='little', signed=True) / 10.0
+    speed = distance = elapsed_time = incline = None
+
+    try:
+        if flags & 0x01 and len(data) >= idx + 2:  # Bit 0 = speed present
+            speed = int.from_bytes(data[idx:idx+2], 'little') / 100.0
+            idx += 2
+
+        if flags & 0x04 and len(data) >= idx + 3:  # Bit 2 = distance present
+            distance = int.from_bytes(data[idx:idx+3], 'little') / 1000.0
+            idx += 3
+
+        if flags & 0x08 and len(data) >= idx + 2:  # Bit 3 = incline present
+            incline = int.from_bytes(data[idx:idx+2], 'little', signed=True) / 10.0
+            idx += 2
+
+        if flags & 0x0400 and len(data) >= idx + 3:  # Bit 10 = elapsed time present
+            elapsed_time = int.from_bytes(data[idx:idx+3], 'little')
+            idx += 3
+    except Exception as e:
+        print(f"[WARN] Failed to parse treadmill data: {e}")
 
     return speed, distance, incline, elapsed_time
