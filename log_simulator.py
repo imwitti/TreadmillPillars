@@ -16,6 +16,6 @@ async def simulate_from_log(callback, log_path=None):
 
     for entry in log_entries:
         raw_bytes = bytes.fromhex(entry["raw"])
-        print(f"[Sim] Sending: {entry['timestamp']} raw={entry['raw']}")
+        #print(f"[Sim] Sending: {entry['timestamp']} raw={entry['raw']}")
         callback(None, raw_bytes)
         await asyncio.sleep(1)

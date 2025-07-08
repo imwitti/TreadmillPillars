@@ -219,6 +219,6 @@ def parse_treadmill_data(data: bytes):
         parsed.get("elapsed_time_s")
     )
 
-    print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
+    #print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
 
     return values

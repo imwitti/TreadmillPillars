@@ -8,7 +8,6 @@ from datetime import datetime
 import json
 
 
-
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
     distance = 0.0
     for i in range(len(speed_profile)):
@@ -23,6 +22,7 @@ def simulate_ghost_distance(speed_profile, elapsed_seconds):
     return distance * 1000  # meters
 
 async def exercise_routine(initial_speed, routine, video_path):
+    shared_state = {"elapsed_time": 0.0}
     treadmill = TreadmillControl()
     await treadmill.connect()
     await treadmill.request_control()
@@ -72,7 +72,9 @@ async def exercise_routine(initial_speed, routine, video_path):
         if elapsed_time is None:
             elapsed_time = 0.0
 
-        print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %, Time: {elapsed_time:.1f}s")
+        #print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %, Time: {elapsed_time:.1f}s")
+        shared_state["elapsed_time"] = elapsed_time
+
 
 
         loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
@@ -114,7 +116,7 @@ async def exercise_routine(initial_speed, routine, video_path):
 
             print("[SEGMENT] Waiting for treadmill-reported segment start time...")
             try:
-                segment_start_time = await asyncio.wait_for(elapsed_time_queue.get(), timeout=10)
+                segment_start_time = shared_state["elapsed_time"]
                 print(f"[SEGMENT] Segment started at treadmill time: {segment_start_time}s")
             except asyncio.TimeoutError:
                 print("[ERROR] Timeout waiting for elapsed_time_queue (start of segment)")
