@@ -16,10 +16,11 @@ def get_screen_resolution():
         print("Could not determine screen resolution:", e)
         return 1280, 720
 
-async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, start_time, ghost_gap_queue, exit_signal):
+async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal):
     cap = cv2.VideoCapture(video_path)
     last_known_speed = 0.0
     last_known_distance = 0.0
+    elapsed_time_seconds = 0
     last_ghost_gaps = {}
     speed_ratio = 1.0
     ghost_runner_hud = GhostRunnerHUD()
@@ -61,9 +62,13 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         (text_width, text_height), _ = cv2.getTextSize(hud_distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         cv2.putText(frame, hud_distance_text, (frame.shape[1] - text_width - 10, text_height + 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        try:
+            elapsed_time_seconds = elapsed_time_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass  # use last known value
+        hud_time_text = f"Time: {int(elapsed_time_seconds // 60)}:{int(elapsed_time_seconds % 60):02d}"
 
-        elapsed_time = time.time() - start_time
-        hud_time_text = f"Time: {int(elapsed_time // 60)}:{int(elapsed_time % 60):02d}"
         cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 

@@ -9,29 +9,38 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
             [Folder] remotes/
                 [Folder] origin/
     [Folder] objects/
+        [Folder] 00/
         [Folder] 01/
         [Folder] 02/
+        [Folder] 04/
         [Folder] 05/
         [Folder] 06/
+        [Folder] 08/
         [Folder] 09/
         [Folder] 0a/
         [Folder] 0d/
         [Folder] 0e/
+        [Folder] 11/
         [Folder] 12/
         [Folder] 13/
+        [Folder] 14/
         [Folder] 16/
         [Folder] 18/
+        [Folder] 19/
         [Folder] 1b/
+        [Folder] 1d/
         [Folder] 21/
         [Folder] 24/
         [Folder] 25/
         [Folder] 26/
         [Folder] 27/
+        [Folder] 28/
         [Folder] 2a/
         [Folder] 2d/
         [Folder] 2e/
         [Folder] 2f/
         [Folder] 31/
+        [Folder] 33/
         [Folder] 34/
         [Folder] 3b/
         [Folder] 3d/
@@ -48,6 +57,8 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 56/
         [Folder] 58/
         [Folder] 5b/
+        [Folder] 5c/
+        [Folder] 5d/
         [Folder] 5f/
         [Folder] 61/
         [Folder] 62/
@@ -61,15 +72,18 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 6d/
         [Folder] 6e/
         [Folder] 6f/
+        [Folder] 72/
         [Folder] 73/
         [Folder] 74/
         [Folder] 77/
         [Folder] 78/
+        [Folder] 7a/
         [Folder] 7d/
         [Folder] 7e/
         [Folder] 80/
         [Folder] 81/
         [Folder] 83/
+        [Folder] 84/
         [Folder] 86/
         [Folder] 8a/
         [Folder] 8c/
@@ -81,11 +95,14 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 95/
         [Folder] 96/
         [Folder] 97/
+        [Folder] 9b/
         [Folder] 9d/
         [Folder] 9e/
         [Folder] a1/
+        [Folder] a2/
         [Folder] a3/
         [Folder] a5/
+        [Folder] a7/
         [Folder] a9/
         [Folder] ad/
         [Folder] ae/
@@ -94,14 +111,17 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] b7/
         [Folder] ba/
         [Folder] bd/
+        [Folder] bf/
         [Folder] c0/
         [Folder] c2/
         [Folder] c3/
+        [Folder] c5/
         [Folder] c6/
         [Folder] c7/
         [Folder] c9/
         [Folder] ca/
         [Folder] cb/
+        [Folder] cc/
         [Folder] d1/
         [Folder] d6/
         [Folder] d8/
@@ -116,6 +136,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] e8/
         [Folder] e9/
         [Folder] ea/
+        [Folder] eb/
         [Folder] ec/
         [Folder] ee/
         [Folder] f0/
@@ -133,6 +154,94 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
             [Folder] origin/
         [Folder] tags/
 [Folder] Ancillaries/
+    [File] log_ftms_data.py
+    --- Start of log_ftms_data.py ---
+    import asyncio
+    import json
+    import time
+    from datetime import datetime
+    from bleak import BleakScanner, BleakClient
+    
+    FTMS_SERVICE_UUID = "00001826-0000-1000-8000-00805f9b34fb"
+    TREADMILL_DATA_UUID = "00002ACD-0000-1000-8000-00805f9b34fb"
+    
+    log_file = "treadmill_log.json"
+    log_data = []
+    
+    def parse_treadmill_data(data: bytearray):
+        flags = int.from_bytes(data[0:2], byteorder='little')
+        idx = 2
+    
+        speed = distance = elapsed_time = incline = None
+    
+        if flags & 0x01:  # Bit 0 = speed present
+            speed = int.from_bytes(data[idx:idx+2], 'little') / 100.0
+            idx += 2
+    
+        if flags & 0x04:  # Bit 2 = distance present
+            distance = int.from_bytes(data[idx:idx+3], 'little') / 1000.0
+            idx += 3
+    
+        if flags & 0x08:  # Bit 3 = incline present
+            incline = int.from_bytes(data[idx:idx+2], 'little', signed=True) / 10.0
+            idx += 2
+    
+        if flags & 0x0400:  # Bit 10 = elapsed time present
+            elapsed_time = int.from_bytes(data[idx:idx+3], 'little')
+            idx += 3
+    
+        return {
+            "speed_kmh": speed,
+            "distance_km": distance,
+            "incline_percent": incline,
+            "elapsed_time_s": elapsed_time,
+        }
+    
+    def notification_handler(_, data: bytearray):
+        parsed = parse_treadmill_data(data)
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "raw": data.hex(),
+            "parsed": parsed
+        }
+        log_data.append(entry)
+        print(f"[{entry['timestamp']}] {parsed}")
+    
+    async def main():
+        print("Scanning for treadmill...")
+        devices = await BleakScanner.discover()
+    
+        treadmill = None
+        for device in devices:
+            if FTMS_SERVICE_UUID.lower() in [uuid.lower() for uuid in device.metadata.get("uuids", [])]:
+                treadmill = device
+                break
+    
+        if not treadmill:
+            print("Treadmill with FTMS service not found.")
+            return
+    
+        print(f"Connecting to {treadmill.name} ({treadmill.address})...")
+        async with BleakClient(treadmill.address) as client:
+            print("Connected. Subscribing to treadmill data notifications...")
+            await client.start_notify(TREADMILL_DATA_UUID, notification_handler)
+    
+            try:
+                print("Logging for 60 seconds... (Ctrl+C to stop early)")
+                await asyncio.sleep(60)
+            except KeyboardInterrupt:
+                print("Stopped by user.")
+    
+            await client.stop_notify(TREADMILL_DATA_UUID)
+    
+        with open(log_file, "w") as f:
+            json.dump(log_data, f, indent=2)
+        print(f"Saved log to {log_file}")
+    
+    if __name__ == "__main__":
+        asyncio.run(main())
+    --- End of log_ftms_data.py ---
+
     [File] shrinkvideos.py
     --- Start of shrinkvideos.py ---
     import cv2
@@ -349,30 +458,11 @@ from treadmill_control import TreadmillControl, parse_treadmill_data
 from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
 from virtual_competitors import generate_competitors_with_profiles
-import queue
 import time
 from datetime import datetime
 import json
 
-def check_and_update_pbs(workout_data, pb_times, distances_km=[1, 3, 5, 10, 21]):
-    updated = False
-    for target_km in distances_km:
-        best_time = None
-        for i in range(len(workout_data)):
-            for j in range(i+1, len(workout_data)):
-                dist_diff = workout_data[j]["distance"] - workout_data[i]["distance"]
-                if dist_diff >= target_km:
-                    time_diff = (workout_data[j]["timestamp"] - workout_data[i]["timestamp"]).total_seconds() / 60
-                    if best_time is None or time_diff < best_time:
-                        best_time = time_diff
-                    break
-        if best_time and (str(target_km) not in pb_times or best_time < pb_times[str(target_km)]):
-            pb_times[str(target_km)] = round(best_time, 1)
-            updated = True
-    if updated:
-        with open("user_config.json", "w") as f:
-            json.dump({"pb_times_minutes": pb_times}, f, indent=2)
-        print("🎉 New PBs updated:", pb_times)
+
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
     distance = 0.0
@@ -386,6 +476,7 @@ def simulate_ghost_distance(speed_profile, elapsed_seconds):
         if elapsed_seconds < t_end:
             break
     return distance * 1000  # meters
+
 async def exercise_routine(initial_speed, routine, video_path):
     treadmill = TreadmillControl()
     await treadmill.connect()
@@ -393,17 +484,17 @@ async def exercise_routine(initial_speed, routine, video_path):
     await asyncio.sleep(10)
     await treadmill.set_incline(1.0)
 
-    speed_ratio_queue = queue.Queue()
-    speed_ratio_queue.put(1.0)
-    speed_queue = queue.Queue()
-    speed_queue.put(initial_speed)
-    distance_queue = queue.Queue()
-    distance_queue.put(0.0)
-    ghost_gap_queue = queue.Queue()
-    exit_signal = queue.Queue()  # 🆕 Added for graceful exit
+    speed_ratio_queue = asyncio.Queue()
+    await speed_ratio_queue.put(1.0)
+    speed_queue = asyncio.Queue()
+    await speed_queue.put(initial_speed)
+    distance_queue = asyncio.Queue()
+    await distance_queue.put(0.0)
+    elapsed_time_queue = asyncio.Queue()
+    ghost_gap_queue = asyncio.Queue()
+    exit_signal = asyncio.Queue()
 
     start_time = datetime.utcnow()
-    workout_data = []
 
     total_minutes = sum(duration for duration, _ in routine)
     total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
@@ -419,75 +510,111 @@ async def exercise_routine(initial_speed, routine, video_path):
 
     start_tcx_file(start_time)
 
+    loop = asyncio.get_event_loop()
+    last_logged_distance = None  # for ghost update throttling
+    last_distance = 0.0  # to track the most recent treadmill distance
+
     def callback(sender, data):
-        speed, distance, incline = parse_treadmill_data(data)
-        print(f"Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %")
-        speed_ratio = speed / initial_speed if initial_speed > 0 else 1.0
-        speed_ratio_queue.put(speed_ratio)
-        speed_queue.put(speed)
-        distance_queue.put(distance)
+        nonlocal last_logged_distance, last_distance
+
+        speed, distance, incline, elapsed_time = parse_treadmill_data(data)
+        if incline is None:
+            incline = 0.0
+        if speed is None:
+            speed = 0.0
+        if distance is None:
+            distance = 0.0
+        if elapsed_time is None:
+            elapsed_time = 0.0
+
+        print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %, Time: {elapsed_time:.1f}s")
+
+
+        loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
+        loop.call_soon_threadsafe(speed_queue.put_nowait, speed)
+        loop.call_soon_threadsafe(distance_queue.put_nowait, distance)
+        loop.call_soon_threadsafe(elapsed_time_queue.put_nowait, elapsed_time)
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
-        workout_data.append({
-            "timestamp": timestamp,
-            "speed": speed,
-            "distance": distance,
-            "incline": incline
-        })
-
-        # Check PBs every 10 samples
-        if len(workout_data) % 10 == 0:
-            try:
-                with open("user_config.json", "r") as f:
-                    config = json.load(f)
-                pb_times = config.get("pb_times_minutes", {})
-                check_and_update_pbs(workout_data, pb_times)
-            except Exception as e:
-                print("PB check failed:", e)
+        last_distance = distance  # Update the final known distance
 
         elapsed = (timestamp - start_time).total_seconds()
         user_distance_m = distance * 1000
-        ghost_gaps = {}
-        for ghost in ghost_runners:
-            ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
-            gap = user_distance_m - ghost_distance_m
-            ghost_gaps[ghost["name"]] = gap
-            #print(f"[Ghost] {ghost['name']}\n Segment Speed: {ghost['speed_profile'][0][1]:.2f} km/h\n Distance: {ghost_distance_m:.1f} m\n Gap: {gap:+.1f} m")
-        ghost_gap_queue.put(ghost_gaps)
 
+        # Throttle ghost gap updates by rounding distance to the nearest 0.1 meter
+        distance_rounded = round(user_distance_m, 1)
+        if last_logged_distance != distance_rounded:
+            last_logged_distance = distance_rounded
+            ghost_gaps = {}
+            for ghost in ghost_runners:
+                ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
+                gap = user_distance_m - ghost_distance_m
+                ghost_gaps[ghost["name"]] = gap
+            loop.call_soon_threadsafe(ghost_gap_queue.put_nowait, ghost_gaps)
+
+    print("[INFO] Starting treadmill monitoring...")
     await treadmill.start_monitoring(callback)
 
+    print("[INFO] Launching video task...")
     video_task = asyncio.create_task(
-        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue, exit_signal)  # 🆕 pass exit_signal
+        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal)
     )
 
     try:
-        for duration, speed_increment in routine:
+        print("[INFO] Starting routine segments...")
+        for idx, (duration, speed_increment) in enumerate(routine):
+            print(f"[SEGMENT {idx}] Setting speed to {speed_increment:.2f} km/h for {duration:.1f} min")
             await treadmill.set_speed(speed_increment)
-            for _ in range(int(duration * 60)):
-                await asyncio.sleep(1)
+
+            print("[SEGMENT] Waiting for treadmill-reported segment start time...")
+            try:
+                segment_start_time = await asyncio.wait_for(elapsed_time_queue.get(), timeout=10)
+                print(f"[SEGMENT] Segment started at treadmill time: {segment_start_time}s")
+            except asyncio.TimeoutError:
+                print("[ERROR] Timeout waiting for elapsed_time_queue (start of segment)")
+                break
+
+            target_time = segment_start_time + duration * 60
+            print(f"[SEGMENT] Target end time: {target_time}s")
+
+            while True:
+                await asyncio.sleep(0.2)
+                try:
+                    current_time = await asyncio.wait_for(elapsed_time_queue.get(), timeout=2)
+                except asyncio.TimeoutError:
+                    print("[WARN] Waiting for treadmill time update...")
+                    continue
+
+                print(f"[SEGMENT] Current treadmill time: {current_time:.1f}s / Target: {target_time:.1f}s")
                 if not exit_signal.empty():
+                    print("[INFO] User exit detected.")
                     raise asyncio.CancelledError("User requested exit")
+                if current_time >= target_time:
+                    print("[SEGMENT] Segment complete.")
+                    break
+
     except asyncio.CancelledError:
-        print("Workout interrupted by user.")
+        print("[INFO] Workout interrupted by user.")
     finally:
+        print("[INFO] Cleaning up...")
         await treadmill.stop_monitoring()
         await treadmill.disconnect()
         await video_task
 
         end_time = datetime.utcnow()
-        final_distance = workout_data[-1]["distance"] if workout_data else 0.0
+        final_distance = last_distance
         finalize_tcx_file(start_time, end_time, final_distance)
 
+        print("[INFO] Workout complete.")
         return {
             "start_time": start_time,
             "end_time": end_time,
-            "workout_data": workout_data,
             "final_distance": final_distance
         }
 --- End of RunRoutine.py ---
 
+[Folder] Simulation/
 [Folder] TCX/
 [Folder] __pycache__/
 [Folder] assets/
@@ -663,6 +790,31 @@ def main():
 if __name__ == "__main__":
     main()
 --- End of list_directory.py ---
+
+[File] log_simulator.py
+--- Start of log_simulator.py ---
+import json
+import asyncio
+import os
+
+async def simulate_from_log(callback, log_path=None):
+    if log_path is None:
+        base_dir = os.path.dirname(__file__)
+        log_path = os.path.join(base_dir, "Simulation", "treadmill_log.json")
+
+    try:
+        with open(log_path, "r") as f:
+            log_entries = json.load(f)
+    except FileNotFoundError:
+        print(f"[Sim] Log file not found at: {os.path.abspath(log_path)}")
+        return
+
+    for entry in log_entries:
+        raw_bytes = bytes.fromhex(entry["raw"])
+        print(f"[Sim] Sending: {entry['timestamp']} raw={entry['raw']}")
+        callback(None, raw_bytes)
+        await asyncio.sleep(1)
+--- End of log_simulator.py ---
 
 [File] menu_ui.py
 --- Start of menu_ui.py ---
@@ -1308,28 +1460,29 @@ def finalize_tcx_file(start_time, end_time, final_distance):
 [File] treadmill_control.py
 --- Start of treadmill_control.py ---
 # treadmill_control.py
+
 import asyncio
 import platform
+import time
 from bleak import BleakScanner, BleakClient
+from log_simulator import simulate_from_log  # only used when testing
 
 ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
 control_point_uuid = "00002AD9-0000-1000-8000-00805f9b34fb"
 treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
 
 class TreadmillControl:
-    def __init__(self, testing=None):
+    def __init__(self, testing=None, log_path="treadmill_log.json"):
         self.client = None
-        if testing is None:
-            self.testing = platform.system() == "Windows"
-        else:
-            self.testing = testing
+        self.testing = platform.system() == "Windows" if testing is None else testing
+        self.log_path = log_path
         self.current_speed = 0.0
-        
+        self.start_time = None
 
     async def connect(self, target_name=None, target_address=None):
         if self.testing:
             print("Simulated connection to treadmill.")
-            self.client = "SimulatedClient"  # Mock client to indicate connection
+            self.client = "SimulatedClient"
             return
 
         for attempt in range(6):
@@ -1341,19 +1494,14 @@ class TreadmillControl:
                 for device, adv_data in devices.values():
                     print(f"- {device.name or 'Unknown'} ({device.address})")
 
-                    # Priority 1: FTMS service
                     if ftms_service_uuid in adv_data.service_uuids:
                         treadmill = device
                         print("Found FTMS treadmill.")
                         break
-
-                    # Priority 2: Match by name
                     if target_name and device.name == target_name:
                         treadmill = device
                         print(f"Matched treadmill by name: {target_name}")
                         break
-
-                    # Priority 3: Match by MAC address
                     if target_address and device.address.lower() == target_address.lower():
                         treadmill = device
                         print(f"Matched treadmill by address: {target_address}")
@@ -1370,8 +1518,7 @@ class TreadmillControl:
                 print(f"Attempt {attempt + 1} failed: {e}")
                 await asyncio.sleep(2)
 
-        raise Exception("Failed to connect after 3 attempts.")
-
+        raise Exception("Failed to connect after 6 attempts.")
 
     async def disconnect(self):
         if self.testing:
@@ -1424,21 +1571,15 @@ class TreadmillControl:
                 print(f"Operation {request_op_code} failed with result code {result_code}")
 
         await self.client.start_notify(control_point_uuid, handle_response)
-        await asyncio.sleep(1)  # Wait for the response
+        await asyncio.sleep(1)
         await self.client.stop_notify(control_point_uuid)
 
     async def start_monitoring(self, callback):
         if self.testing:
-            print("Simulated start monitoring.")
-            # Simulate data
-            async def simulate_data():
-                while True:
-                    speed_value = int(self.current_speed * 100).to_bytes(2, byteorder='little')
-                    data = bytearray([0x08, 0x00]) + speed_value + bytearray([0x00, 0x00, 0x00, 0x00, 0x0A, 0x00])
-                    callback(None, data)
-                    await asyncio.sleep(1)
-            asyncio.create_task(simulate_data())
+            print("Simulated start monitoring from log.")
+            asyncio.create_task(simulate_from_log(callback, self.log_path))
             return
+
         if self.client:
             await self.client.start_notify(treadmill_data_uuid, callback)
 
@@ -1455,15 +1596,750 @@ class TreadmillControl:
     async def decrease_speed(self):
         await self.set_speed(self.current_speed - 0.5)
 
-def parse_treadmill_data(data):
-    flags = data[0]
-    speed = int.from_bytes(data[2:4], byteorder='little') / 100.0
-    distance = int.from_bytes(data[4:7], byteorder='little') /1000
-    incline = None
-    if flags & 0x08:  # Check if Inclination and Ramp Angle Setting Present bit is set
-        incline = int.from_bytes(data[7:9], byteorder='little', signed=True) / 10.0
-    return speed, distance, incline
+
+def parse_treadmill_data(data: bytes):
+    flags = int.from_bytes(data[0:2], byteorder='little')
+    idx = 2
+
+    def read_uint8():
+        nonlocal idx
+        val = data[idx]
+        idx += 1
+        return val
+
+    def read_uint16():
+        nonlocal idx
+        val = int.from_bytes(data[idx:idx+2], 'little')
+        idx += 2
+        return val
+
+    def read_sint16():
+        nonlocal idx
+        val = int.from_bytes(data[idx:idx+2], 'little', signed=True)
+        idx += 2
+        return val
+
+    def read_uint24():
+        nonlocal idx
+        val = int.from_bytes(data[idx:idx+3] + b'\x00', 'little')
+        idx += 3
+        return val
+
+    parsed = {}
+
+    if (flags & 0x01) == 0:
+        parsed["speed_kmh"] = read_uint16() / 100.0
+
+    if flags & (1 << 1):
+        parsed["average_speed_kmh"] = read_uint16() / 100.0
+
+    if flags & (1 << 2):
+        parsed["distance_km"] = read_uint24() / 1000.0
+
+    if flags & (1 << 3):
+        parsed["incline_percent"] = read_sint16() / 10.0
+        idx += 2  # Skip Ramp Angle Setting
+
+    if flags & (1 << 4):
+        parsed["positive_elevation_gain_m"] = read_uint16()
+        parsed["negative_elevation_gain_m"] = read_uint16()
+
+    if flags & (1 << 5):
+        parsed["instantaneous_pace_sec_per_km"] = read_uint16()
+
+    if flags & (1 << 6):
+        parsed["average_pace_sec_per_km"] = read_uint16()
+
+    if flags & (1 << 7):
+        parsed["total_energy_kcal"] = read_uint16()
+        parsed["energy_per_hour_kcal"] = read_uint16()
+        parsed["energy_per_minute_kcal"] = read_uint8()
+
+    if flags & (1 << 8):
+        parsed["heart_rate_bpm"] = read_uint8()
+
+    if flags & (1 << 9):
+        parsed["metabolic_equivalent"] = read_uint8() / 10.0
+
+    if flags & (1 << 10):
+        parsed["elapsed_time_s"] = read_uint16()
+
+    if flags & (1 << 11):
+        parsed["remaining_time_s"] = read_uint16()
+
+    if flags & (1 << 12):
+        parsed["force_on_belt_n"] = read_sint16()
+        parsed["power_output_w"] = read_sint16()
+
+    #return parsed
+
+    values = (
+        parsed.get("speed_kmh"),
+        parsed.get("distance_km"),
+        parsed.get("incline_percent"),
+        parsed.get("elapsed_time_s")
+    )
+
+    print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
+
+    return values
 --- End of treadmill_control.py ---
+
+[File] treadmill_log.json
+--- Start of treadmill_log.json ---
+[
+  {
+    "timestamp": "2025-07-07T18:27:08.630671",
+    "raw": "8c055000000000000005000000630074000700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:10.430616",
+    "raw": "8c055000000000000005000000630074000900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:11.450592",
+    "raw": "8c055000000000000005000000630074000a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:12.230583",
+    "raw": "8c055000000000000005000000630074000b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:13.250533",
+    "raw": "8c056400000000000005000000630074000c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.1,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:14.270598",
+    "raw": "8c05a0000000000000050000007700d0000d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:14.930474",
+    "raw": "8c05d2000000000000050000008c002c000e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.21,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:15.950501",
+    "raw": "8c050401000000000005000000a00088000f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.26,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:16.850313",
+    "raw": "8c053601000000000005000000a00088000f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.31,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:17.870717",
+    "raw": "8c055401000000000005000000b1008c001000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.34,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:18.590422",
+    "raw": "8c055e01000000000005000000bf0074001100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.35,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:19.610142",
+    "raw": "8c055e01000000000005000000bf0074001200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.35,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:20.630069",
+    "raw": "8c055e010a0000000005000000bf0074001300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:21.290334",
+    "raw": "8c055e010a0000000005000000bf0074001400",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:22.310034",
+    "raw": "8c055e010a0000000005000000bf0074001500",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:23.329443",
+    "raw": "8c055e010a0000000005000000bf0074001600",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:23.990326",
+    "raw": "8c0586010a0000000005000000c90004001700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.75,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:25.010297",
+    "raw": "8c05b8010a0000000005000000dd0060001800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:26.030523",
+    "raw": "8c05cc010a0000000005000000dd0060001800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.82,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:26.690227",
+    "raw": "8c05ea010a0000000005000000e700f0001900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.85,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:27.770186",
+    "raw": "8c05f4010a0000000005000100ee0064001a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.86,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:28.490314",
+    "raw": "8c05f4010a0000000005000100f10080001b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.86,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:29.510334",
+    "raw": "8c05f4010a0000000005000100f10080001c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.86,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:30.529831",
+    "raw": "8c05f401140000000005000100f10080001d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:31.189814",
+    "raw": "8c05f401140000000005000100f10080001e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:32.090194",
+    "raw": "8c05f401140000000005000100f10080001f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:33.110080",
+    "raw": "8c05f401140000000005000100f10080002000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:33.889744",
+    "raw": "8c05f401140000000005000100f10080002100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:34.910059",
+    "raw": "8c05f401140000000005000100f10080002100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:35.929998",
+    "raw": "8c05f401140000000005000100f10080002200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:36.590014",
+    "raw": "8c05f401140000000005000100f10080002300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:37.610040",
+    "raw": "8c051c021e0000000005000100f10080002400",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.62,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:38.689963",
+    "raw": "8c054e021e00000000050001000601dc002500",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.67,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:39.289956",
+    "raw": "8c0580021e00000000050001001a01fc002600",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.72,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:40.309928",
+    "raw": "8c05bc021e000000000500020016020c002700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.78,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:41.329986",
+    "raw": "8c05ee021e0000000005000200380250002800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.83,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:42.049895",
+    "raw": "8c0520032800000000050002006102cc002900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:43.129900",
+    "raw": "8c0534032800000000050002007502ec002a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.26,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:43.909843",
+    "raw": "8c0570032800000000050002007502ec002a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.32,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:44.929511",
+    "raw": "8c05a2032800000000050002009e02a4002b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.37,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:45.649800",
+    "raw": "8c05ca03280000000005000200c002ac002c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.41,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:46.669827",
+    "raw": "8c05e803320000000005000300e202b4002d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:47.689687",
+    "raw": "8c05e803320000000005000300f0029c002e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:48.349494",
+    "raw": "8c05e803320000000005000300f0029c002f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:49.369727",
+    "raw": "8c05e803320000000005000300f0029c003000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:50.389804",
+    "raw": "8c05e8033c0000000005000300f0029c003100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:51.109480",
+    "raw": "8c05e8033c0000000005000400f0029c003200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:52.129681",
+    "raw": "8c05e8033c0000000005000400f0029c003300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:52.849723",
+    "raw": "8c05e8033c0000000005000400f0029c003300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:53.929669",
+    "raw": "8c05e8033c0000000005000400f0029c003400",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:54.649584",
+    "raw": "8c05e8034600000a0005000400f0029c003500",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 4588.52,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:55.669197",
+    "raw": "8c05e8034600000a00050005000e0388003600",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 4588.52,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:56.689553",
+    "raw": "8c05e8034600000a00050005000e0388003700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 4588.52,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:57.349649",
+    "raw": "8c05e8035000000a00050005000e0388003800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:58.369226",
+    "raw": "8c05e8035000000a00050005000e0388003900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:59.389551",
+    "raw": "8c05e8035000000a00050005000e0388003a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:00.049456",
+    "raw": "8c05e8035000000a00050006000e0388003b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:01.068930",
+    "raw": "8c05e8035a00000a00050006000e0388003c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:02.089513",
+    "raw": "8c05e8035a00000a00050006000e0388003c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:02.748659",
+    "raw": "8c05e8035a00000a00050006000e0388003d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:03.768971",
+    "raw": "8c05e8035a00000a00050006000e0388003e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:04.848968",
+    "raw": "8c05e8036400000a00050006000e0388003f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:05.509918",
+    "raw": "8c05e8036400000a00050007000e0388004000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:06.589116",
+    "raw": "8c05e8036400000a00050007000e0388004100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:07.309692",
+    "raw": "8c05e8036400000a00050007000e0388004200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  }
+]
+--- End of treadmill_log.json ---
 
 [File] user_config.json
 --- Start of user_config.json ---
@@ -1483,24 +2359,26 @@ def parse_treadmill_data(data):
 import cv2
 import asyncio
 import time
-import subprocess
+import platform
 from ghost_runner_hud import GhostRunnerHUD
 
 def get_screen_resolution():
+    if platform.system() == "Windows":
+        return 1280, 720  # You can change this as needed
     try:
+        import subprocess
         output = subprocess.check_output("xrandr | grep '*' | awk '{print $1}'", shell=True)
-        resolution = output.decode().strip().split('x')
-        return int(resolution[0]), int(resolution[1])
+        width, height = output.decode().strip().split('x')
+        return int(width), int(height)
     except Exception as e:
         print("Could not determine screen resolution:", e)
-        return 1280, 720  # fallback resolution
+        return 1280, 720
 
-async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, start_time, ghost_gap_queue, exit_signal):
+async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal):
     cap = cv2.VideoCapture(video_path)
     last_known_speed = 0.0
     last_known_distance = 0.0
     last_ghost_gaps = {}
-
     speed_ratio = 1.0
     ghost_runner_hud = GhostRunnerHUD()
     confirm_exit = False
@@ -1513,14 +2391,25 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         if not ret:
             break
 
-        if not speed_ratio_queue.empty():
-            speed_ratio = speed_ratio_queue.get()
-        if not speed_queue.empty():
-            last_known_speed = speed_queue.get()
-        if not distance_queue.empty():
-            last_known_distance = distance_queue.get()
-        if not ghost_gap_queue.empty():
-            last_ghost_gaps = ghost_gap_queue.get()
+        try:
+            speed_ratio = speed_ratio_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+
+        try:
+            last_known_speed = speed_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+
+        try:
+            last_known_distance = distance_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+
+        try:
+            last_ghost_gaps = ghost_gap_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
 
         # HUD
         hud_speed_text = f"{last_known_speed:.1f} km/h"
@@ -1531,8 +2420,10 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         cv2.putText(frame, hud_distance_text, (frame.shape[1] - text_width - 10, text_height + 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        elapsed_time = time.time() - start_time
-        hud_time_text = f"Time: {int(elapsed_time // 60)}:{int(elapsed_time % 60):02d}"
+
+
+        hud_time_text = f"Time: {int(elapsed_time_queue // 60)}:{int(elapsed_time_queue % 60):02d}"
+
         cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
@@ -1559,8 +2450,8 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         frame = cv2.resize(frame, (screen_width, screen_height))
 
         # Display
-        cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty("Video", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Video", screen_width, screen_height)
         cv2.imshow("Video", frame)
 
         key = cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF
@@ -1570,11 +2461,11 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
             esc_pressed_once = True
         elif confirm_exit:
             if key in [ord('y'), ord('Y'), 13, 10]:  # Y or Enter
-                exit_signal.put(True)
+                await exit_signal.put(True)
                 break
-            elif key in [ord('n'), ord('N')]:  # N
+            elif key in [ord('n'), ord('N')]:
                 confirm_exit = False
-            elif key in [27, 8,38] and esc_pressed_once:  # ESC again = No
+            elif key in [27, 8, 38] and esc_pressed_once:
                 confirm_exit = False
                 esc_pressed_once = False
 

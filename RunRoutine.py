@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 import json
 
+
+
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
     distance = 0.0
     for i in range(len(speed_profile)):
@@ -101,7 +103,7 @@ async def exercise_routine(initial_speed, routine, video_path):
 
     print("[INFO] Launching video task...")
     video_task = asyncio.create_task(
-        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, time.time(), ghost_gap_queue, exit_signal)
+        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal)
     )
 
     try:

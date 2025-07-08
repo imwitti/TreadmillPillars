@@ -1,0 +1,652 @@
+[
+  {
+    "timestamp": "2025-07-07T18:27:08.630671",
+    "raw": "8c055000000000000005000000630074000700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:10.430616",
+    "raw": "8c055000000000000005000000630074000900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:11.450592",
+    "raw": "8c055000000000000005000000630074000a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:12.230583",
+    "raw": "8c055000000000000005000000630074000b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.08,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:13.250533",
+    "raw": "8c056400000000000005000000630074000c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.1,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:14.270598",
+    "raw": "8c05a0000000000000050000007700d0000d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:14.930474",
+    "raw": "8c05d2000000000000050000008c002c000e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.21,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:15.950501",
+    "raw": "8c050401000000000005000000a00088000f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.26,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:16.850313",
+    "raw": "8c053601000000000005000000a00088000f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.31,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:17.870717",
+    "raw": "8c055401000000000005000000b1008c001000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.34,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:18.590422",
+    "raw": "8c055e01000000000005000000bf0074001100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.35,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:19.610142",
+    "raw": "8c055e01000000000005000000bf0074001200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 0.35,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:20.630069",
+    "raw": "8c055e010a0000000005000000bf0074001300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:21.290334",
+    "raw": "8c055e010a0000000005000000bf0074001400",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:22.310034",
+    "raw": "8c055e010a0000000005000000bf0074001500",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:23.329443",
+    "raw": "8c055e010a0000000005000000bf0074001600",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.71,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:23.990326",
+    "raw": "8c0586010a0000000005000000c90004001700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.75,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:25.010297",
+    "raw": "8c05b8010a0000000005000000dd0060001800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:26.030523",
+    "raw": "8c05cc010a0000000005000000dd0060001800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.82,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:26.690227",
+    "raw": "8c05ea010a0000000005000000e700f0001900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.85,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:27.770186",
+    "raw": "8c05f4010a0000000005000100ee0064001a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.86,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:28.490314",
+    "raw": "8c05f4010a0000000005000100f10080001b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.86,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:29.510334",
+    "raw": "8c05f4010a0000000005000100f10080001c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 655.86,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:30.529831",
+    "raw": "8c05f401140000000005000100f10080001d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:31.189814",
+    "raw": "8c05f401140000000005000100f10080001e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:32.090194",
+    "raw": "8c05f401140000000005000100f10080001f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:33.110080",
+    "raw": "8c05f401140000000005000100f10080002000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:33.889744",
+    "raw": "8c05f401140000000005000100f10080002100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:34.910059",
+    "raw": "8c05f401140000000005000100f10080002100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:35.929998",
+    "raw": "8c05f401140000000005000100f10080002200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:36.590014",
+    "raw": "8c05f401140000000005000100f10080002300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1311.22,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:37.610040",
+    "raw": "8c051c021e0000000005000100f10080002400",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.62,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:38.689963",
+    "raw": "8c054e021e00000000050001000601dc002500",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.67,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:39.289956",
+    "raw": "8c0580021e00000000050001001a01fc002600",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.72,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:40.309928",
+    "raw": "8c05bc021e000000000500020016020c002700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.78,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:41.329986",
+    "raw": "8c05ee021e0000000005000200380250002800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 1966.83,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:42.049895",
+    "raw": "8c0520032800000000050002006102cc002900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:43.129900",
+    "raw": "8c0534032800000000050002007502ec002a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.26,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:43.909843",
+    "raw": "8c0570032800000000050002007502ec002a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.32,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:44.929511",
+    "raw": "8c05a2032800000000050002009e02a4002b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.37,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:45.649800",
+    "raw": "8c05ca03280000000005000200c002ac002c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 2622.41,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:46.669827",
+    "raw": "8c05e803320000000005000300e202b4002d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:47.689687",
+    "raw": "8c05e803320000000005000300f0029c002e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:48.349494",
+    "raw": "8c05e803320000000005000300f0029c002f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:49.369727",
+    "raw": "8c05e803320000000005000300f0029c003000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3277.8,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:50.389804",
+    "raw": "8c05e8033c0000000005000300f0029c003100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:51.109480",
+    "raw": "8c05e8033c0000000005000400f0029c003200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:52.129681",
+    "raw": "8c05e8033c0000000005000400f0029c003300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:52.849723",
+    "raw": "8c05e8033c0000000005000400f0029c003300",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:53.929669",
+    "raw": "8c05e8033c0000000005000400f0029c003400",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 3933.16,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327680
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:54.649584",
+    "raw": "8c05e8034600000a0005000400f0029c003500",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 4588.52,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:55.669197",
+    "raw": "8c05e8034600000a00050005000e0388003600",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 4588.52,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:56.689553",
+    "raw": "8c05e8034600000a00050005000e0388003700",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 4588.52,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:57.349649",
+    "raw": "8c05e8035000000a00050005000e0388003800",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:58.369226",
+    "raw": "8c05e8035000000a00050005000e0388003900",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:27:59.389551",
+    "raw": "8c05e8035000000a00050005000e0388003a00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:00.049456",
+    "raw": "8c05e8035000000a00050006000e0388003b00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5243.88,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:01.068930",
+    "raw": "8c05e8035a00000a00050006000e0388003c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:02.089513",
+    "raw": "8c05e8035a00000a00050006000e0388003c00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:02.748659",
+    "raw": "8c05e8035a00000a00050006000e0388003d00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:03.768971",
+    "raw": "8c05e8035a00000a00050006000e0388003e00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 5899.24,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:04.848968",
+    "raw": "8c05e8036400000a00050006000e0388003f00",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:05.509918",
+    "raw": "8c05e8036400000a00050007000e0388004000",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:06.589116",
+    "raw": "8c05e8036400000a00050007000e0388004100",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  },
+  {
+    "timestamp": "2025-07-07T18:28:07.309692",
+    "raw": "8c05e8036400000a00050007000e0388004200",
+    "parsed": {
+      "speed_kmh": null,
+      "distance_km": 6554.6,
+      "incline_percent": 0.0,
+      "elapsed_time_s": 327690
+    }
+  }
+]
