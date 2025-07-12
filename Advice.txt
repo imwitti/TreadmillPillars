@@ -1,11 +1,4 @@
-✅ All Feature Goals (and Known Issues)
-Fix screensaver lockouts on Linux/Orange Pi.
 
-Replace time-based routine advancement with treadmill-based (distance or time from treadmill).
-
-Throttle ghost runner updates to match treadmill distance granularity (0.01 km).
-
-Cap workout_data memory usage to prevent app slowdown.
 
 Support time- or distance-based segments in routines.
 
@@ -22,6 +15,7 @@ Enhance UI to show segment type and incline info in menu.
 Add unit tests to verify support for mixed segment types and incline logic.
 
 Update PB's based on parsing the finished TCX 
+Turn TCX into fit file
 
 🧭 Execution Plan – Ordered for Stability
 Each step builds toward the final feature set without breaking existing functionality.

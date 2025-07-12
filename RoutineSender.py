@@ -27,7 +27,6 @@ def disable_screensaver():
         os.system("xset -dpms")
         os.system("xset s noblank")
 
-
 def load_user_config(config_path='user_config.json'):
     try:
         with open(config_path, 'r') as file:
@@ -35,14 +34,12 @@ def load_user_config(config_path='user_config.json'):
     except Exception:
         return {}
 
-
 def load_routines(file_path):
     try:
         with open(file_path, 'r') as file:
             return json.load(file)
     except Exception:
         return {}
-
 
 def list_videos(video_folder):
     videos = []
@@ -52,12 +49,10 @@ def list_videos(video_folder):
             videos.append((file, name, float(speed), float(distance)))
     return videos
 
-
 def parse_video_title(title):
     base = os.path.splitext(title)[0]
     parts = base.split('_')
     return parts[0].lower(), parts[1], parts[2]
-
 
 def run_thumbnail_generators():
     print("Generating thumbnails...")
@@ -73,34 +68,23 @@ def run_thumbnail_generators():
     else:
         print("Video thumbnail generator not found.")
 
-
 def display_pb_times(screen, font, pb_times):
-    # Load and scale the background image
     background_image = pygame.image.load("assets/background.jpg").convert()
     background_image = pygame.transform.scale(background_image, screen.get_size())
-
-    # Draw the background
     screen.blit(background_image, (0, 0))
-    
-    y = 100  # starting y-position for text
+    y = 100
     screen_width = screen.get_width()
-
     for km_str in ["1", "3", "5", "10", "21"]:
         if km_str in pb_times:
             km = float(km_str)
-            speed = km / (pb_times[km_str] / 60)  # speed in km/h
-            
+            speed = km / (pb_times[km_str] / 60)
             text_str = f"PB {km_str}km: {pb_times[km_str]:.1f} min Speed: {speed:.1f} kmph"
-            txt_surface = font.render(text_str, True, (255, 255, 255))  # white text
+            txt_surface = font.render(text_str, True, (255, 255, 255))
             text_rect = txt_surface.get_rect(center=(screen_width // 2, y))
-            
             screen.blit(txt_surface, text_rect)
-            y += 50  # vertical spacing between lines
-
+            y += 50
     pygame.display.flip()
     pygame.time.wait(5000)
-
-
 
 def show_status(screen, font, message):
     screen.fill(BLACK)
@@ -109,7 +93,6 @@ def show_status(screen, font, message):
     screen.blit(text, rect)
     pygame.display.flip()
 
-
 async def main():
     disable_screensaver()
     user_config = load_user_config()
@@ -117,14 +100,14 @@ async def main():
     display_pb_times(screen, font, pb_times)
 
     pb_5k = pb_times.get("5", 25.0)
-    zwo_speed = (5 * 60) / pb_5k  # speed in km/h
+    zwo_speed = (5 * 60) / pb_5k
 
     show_status(screen, font, "Generating thumbnails...")
     run_thumbnail_generators()
 
     show_status(screen, font, "Loading routines...")
     json_routines = load_routines('routines.json')
-    zwo_routines = load_all_zwo_routines('routines', zwo_speed)
+    zwo_routines = load_all_zwo_routines('routines', zwo_speed)  # should return {name: {"type": ..., "segments": [...]}}
     routines = {**json_routines, **zwo_routines}
 
     show_status(screen, font, "Loading videos...")
@@ -138,24 +121,25 @@ async def main():
         return
 
     show_status(screen, font, "Preparing workout...")
-    selected_routine = routines[routine_name]
+    routine_data = routines[routine_name]
+
+    if isinstance(routine_data, dict) and "segments" in routine_data:
+        routine_type = routine_data.get("type", "time")
+        routine_segments = routine_data["segments"]
+    else:
+        routine_type = "time"
+        routine_segments = routine_data
 
     show_status(screen, font, "Starting video and routine...")
     result = await exercise_routine(
-         selected_speed,
-         [(d, selected_speed + inc) for d, inc in selected_routine],
-         str(video_path)
+        selected_speed,
+        routine_type,
+        [(d, selected_speed + inc) for d, inc in routine_segments],
+        str(video_path)
     )
 
     if result:
-         show_post_workout_stats(
-         workout_data=result["workout_data"],
-         start_time=result["start_time"],
-         end_time=result["end_time"]
-         # tcx_filename=result.get("tcx_filename")  # Optional if you add it later
-         )
-
-
+        show_post_workout_stats()
 
 if __name__ == "__main__":
     try:

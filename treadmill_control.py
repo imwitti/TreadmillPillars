@@ -135,6 +135,12 @@ class TreadmillControl:
     async def decrease_speed(self):
         await self.set_speed(self.current_speed - 0.5)
 
+    async def start_or_resume(self):
+            if self.testing:
+                print("Simulated FTMS start/resume command.")
+                return
+            await self.client.write_gatt_char(control_point_uuid, bytearray([0x07]))
+            await self.wait_for_response()
 
 def parse_treadmill_data(data: bytes):
     flags = int.from_bytes(data[0:2], byteorder='little')
@@ -222,3 +228,5 @@ def parse_treadmill_data(data: bytes):
     #print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
 
     return values
+
+    

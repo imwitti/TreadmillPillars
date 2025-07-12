@@ -11,6 +11,9 @@ def parse_zwo_file(file_path, starting_speed):
     root = tree.getroot()
 
     routine_name = root.find('name').text.strip()
+    duration_type_elem = root.find('durationType')
+    duration_type = duration_type_elem.text.strip().lower() if duration_type_elem is not None else "time"
+
     routine = []
 
     for block in root.find('workout'):
@@ -28,7 +31,7 @@ def parse_zwo_file(file_path, starting_speed):
         speed_increment = target_speed - starting_speed
         routine.append((duration_min, speed_increment))
 
-    return {routine_name: routine}
+    return {routine_name: {"type": duration_type, "segments": routine}}
 
 def load_all_zwo_routines(folder_path, starting_speed):
     """

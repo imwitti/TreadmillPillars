@@ -173,8 +173,9 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5, pb_times=None):
                 # PB Highlighting
                 if carousel_i == 2:
                     selected_routine = routines[routine_names[selections[0]]]
-                    total_duration = sum(d for d, _ in selected_routine)
-                    increments = [inc for _, inc in selected_routine]
+                    segments = selected_routine["segments"] if isinstance(selected_routine, dict) and "segments" in selected_routine else selected_routine
+                    total_duration = sum(d for d, _ in segments)
+                    increments = [inc for _, inc in segments]
                     avg_increment = sum(increments) / len(increments) if increments else 0
 
                     for dist_str, pb_time in pb_times.items():
