@@ -24,6 +24,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 12/
         [Folder] 13/
         [Folder] 14/
+        [Folder] 15/
         [Folder] 16/
         [Folder] 18/
         [Folder] 19/
@@ -37,6 +38,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 26/
         [Folder] 27/
         [Folder] 28/
+        [Folder] 29/
         [Folder] 2a/
         [Folder] 2d/
         [Folder] 2e/
@@ -44,7 +46,9 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 31/
         [Folder] 33/
         [Folder] 34/
+        [Folder] 36/
         [Folder] 37/
+        [Folder] 3a/
         [Folder] 3b/
         [Folder] 3d/
         [Folder] 3e/
@@ -52,12 +56,14 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 40/
         [Folder] 42/
         [Folder] 44/
+        [Folder] 46/
         [Folder] 48/
         [Folder] 49/
         [Folder] 4b/
         [Folder] 4c/
         [Folder] 4d/
         [Folder] 4e/
+        [Folder] 51/
         [Folder] 52/
         [Folder] 53/
         [Folder] 54/
@@ -81,12 +87,15 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 6d/
         [Folder] 6e/
         [Folder] 6f/
+        [Folder] 71/
         [Folder] 72/
         [Folder] 73/
         [Folder] 74/
         [Folder] 77/
         [Folder] 78/
+        [Folder] 79/
         [Folder] 7a/
+        [Folder] 7b/
         [Folder] 7d/
         [Folder] 7e/
         [Folder] 80/
@@ -94,6 +103,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 83/
         [Folder] 84/
         [Folder] 86/
+        [Folder] 89/
         [Folder] 8a/
         [Folder] 8c/
         [Folder] 8f/
@@ -112,12 +122,14 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] a3/
         [Folder] a5/
         [Folder] a7/
+        [Folder] a8/
         [Folder] a9/
         [Folder] ab/
         [Folder] ac/
         [Folder] ad/
         [Folder] ae/
         [Folder] af/
+        [Folder] b3/
         [Folder] b5/
         [Folder] b6/
         [Folder] b7/
@@ -127,6 +139,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] bd/
         [Folder] bf/
         [Folder] c0/
+        [Folder] c1/
         [Folder] c2/
         [Folder] c3/
         [Folder] c5/
@@ -144,6 +157,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] d8/
         [Folder] d9/
         [Folder] db/
+        [Folder] dd/
         [Folder] de/
         [Folder] df/
         [Folder] e0/
@@ -157,15 +171,18 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] ea/
         [Folder] eb/
         [Folder] ec/
+        [Folder] ed/
         [Folder] ee/
         [Folder] f0/
         [Folder] f2/
         [Folder] f3/
+        [Folder] f4/
         [Folder] f5/
         [Folder] f6/
         [Folder] f9/
         [Folder] fd/
         [Folder] fe/
+        [Folder] ff/
         [Folder] info/
         [Folder] pack/
     [Folder] refs/
@@ -334,7 +351,6 @@ def disable_screensaver():
         os.system("xset -dpms")
         os.system("xset s noblank")
 
-
 def load_user_config(config_path='user_config.json'):
     try:
         with open(config_path, 'r') as file:
@@ -342,14 +358,12 @@ def load_user_config(config_path='user_config.json'):
     except Exception:
         return {}
 
-
 def load_routines(file_path):
     try:
         with open(file_path, 'r') as file:
             return json.load(file)
     except Exception:
         return {}
-
 
 def list_videos(video_folder):
     videos = []
@@ -359,12 +373,10 @@ def list_videos(video_folder):
             videos.append((file, name, float(speed), float(distance)))
     return videos
 
-
 def parse_video_title(title):
     base = os.path.splitext(title)[0]
     parts = base.split('_')
     return parts[0].lower(), parts[1], parts[2]
-
 
 def run_thumbnail_generators():
     print("Generating thumbnails...")
@@ -380,34 +392,23 @@ def run_thumbnail_generators():
     else:
         print("Video thumbnail generator not found.")
 
-
 def display_pb_times(screen, font, pb_times):
-    # Load and scale the background image
     background_image = pygame.image.load("assets/background.jpg").convert()
     background_image = pygame.transform.scale(background_image, screen.get_size())
-
-    # Draw the background
     screen.blit(background_image, (0, 0))
-    
-    y = 100  # starting y-position for text
+    y = 100
     screen_width = screen.get_width()
-
     for km_str in ["1", "3", "5", "10", "21"]:
         if km_str in pb_times:
             km = float(km_str)
-            speed = km / (pb_times[km_str] / 60)  # speed in km/h
-            
+            speed = km / (pb_times[km_str] / 60)
             text_str = f"PB {km_str}km: {pb_times[km_str]:.1f} min Speed: {speed:.1f} kmph"
-            txt_surface = font.render(text_str, True, (255, 255, 255))  # white text
+            txt_surface = font.render(text_str, True, (255, 255, 255))
             text_rect = txt_surface.get_rect(center=(screen_width // 2, y))
-            
             screen.blit(txt_surface, text_rect)
-            y += 50  # vertical spacing between lines
-
+            y += 50
     pygame.display.flip()
     pygame.time.wait(5000)
-
-
 
 def show_status(screen, font, message):
     screen.fill(BLACK)
@@ -416,7 +417,6 @@ def show_status(screen, font, message):
     screen.blit(text, rect)
     pygame.display.flip()
 
-
 async def main():
     disable_screensaver()
     user_config = load_user_config()
@@ -424,14 +424,14 @@ async def main():
     display_pb_times(screen, font, pb_times)
 
     pb_5k = pb_times.get("5", 25.0)
-    zwo_speed = (5 * 60) / pb_5k  # speed in km/h
+    zwo_speed = (5 * 60) / pb_5k
 
     show_status(screen, font, "Generating thumbnails...")
     run_thumbnail_generators()
 
     show_status(screen, font, "Loading routines...")
     json_routines = load_routines('routines.json')
-    zwo_routines = load_all_zwo_routines('routines', zwo_speed)
+    zwo_routines = load_all_zwo_routines('routines', zwo_speed)  # should return {name: {"type": ..., "segments": [...]}}
     routines = {**json_routines, **zwo_routines}
 
     show_status(screen, font, "Loading videos...")
@@ -445,24 +445,25 @@ async def main():
         return
 
     show_status(screen, font, "Preparing workout...")
-    selected_routine = routines[routine_name]
+    routine_data = routines[routine_name]
+
+    if isinstance(routine_data, dict) and "segments" in routine_data:
+        routine_type = routine_data.get("type", "time")
+        routine_segments = routine_data["segments"]
+    else:
+        routine_type = "time"
+        routine_segments = routine_data
 
     show_status(screen, font, "Starting video and routine...")
     result = await exercise_routine(
-         selected_speed,
-         [(d, selected_speed + inc) for d, inc in selected_routine],
-         str(video_path)
+        selected_speed,
+        routine_type,
+        [(d, selected_speed + inc) for d, inc in routine_segments],
+        str(video_path)
     )
 
     if result:
-         show_post_workout_stats(
-         workout_data=result["workout_data"],
-         start_time=result["start_time"],
-         end_time=result["end_time"]
-         # tcx_filename=result.get("tcx_filename")  # Optional if you add it later
-         )
-
-
+        show_post_workout_stats()
 
 if __name__ == "__main__":
     try:
@@ -478,9 +479,7 @@ from treadmill_control import TreadmillControl, parse_treadmill_data
 from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
 from virtual_competitors import generate_competitors_with_profiles
-import time
 from datetime import datetime
-import json
 
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
@@ -496,13 +495,12 @@ def simulate_ghost_distance(speed_profile, elapsed_seconds):
             break
     return distance * 1000  # meters
 
-async def exercise_routine(initial_speed, routine, video_path):
-    shared_state = {"elapsed_time": 0.0}
+
+async def exercise_routine(initial_speed, routine_type, routine, video_path):
+    shared_state = {"elapsed_time": 0.0, "distance": 0.0}
     treadmill = TreadmillControl()
     await treadmill.connect()
     await treadmill.request_control()
-    await asyncio.sleep(10)
-    await treadmill.set_incline(1.0)
 
     speed_ratio_queue = asyncio.Queue(maxsize=1)
     await speed_ratio_queue.put(1.0)
@@ -514,43 +512,55 @@ async def exercise_routine(initial_speed, routine, video_path):
     ghost_gap_queue = asyncio.Queue(maxsize=1)
     exit_signal = asyncio.Queue(maxsize=1)
 
-    start_time = datetime.utcnow()
+    print("[INFO] Launching video playback...")
+    video_task = asyncio.create_task(
+        play_video(
+            video_path,
+            speed_ratio_queue,
+            speed_queue,
+            distance_queue,
+            elapsed_time_queue,
+            ghost_gap_queue,
+            exit_signal
+        )
+    )
 
+    # Wait briefly to allow video first frame to appear
+    await asyncio.sleep(2.0)
+
+    print("[INFO] Sending FTMS 'Start or Resume' command...")
+    await treadmill.start_or_resume()
+
+
+    print("[INFO] Waiting for treadmill's 5-second countdown...")
+    await asyncio.sleep(5)
+
+    print(f"[INFO] Setting initial speed = {initial_speed:.2f} km/h and incline = 1.0%")
+    await treadmill.set_speed(initial_speed)
+    await treadmill.set_incline(1.0)
+
+    start_time = datetime.utcnow()
     total_minutes = sum(duration for duration, _ in routine)
     total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
     avg_speed = total_distance_km / (total_minutes / 60)
     ghost_runners = generate_competitors_with_profiles(total_minutes, avg_speed)
-
-    print("\n--- Ghost Runner Profiles ---")
-    for ghost in ghost_runners:
-        print(f"{ghost['name']}\n Duration: {ghost['duration_min']:.2f} min\n Avg Speed: {ghost['avg_speed']:.2f} km/h\n Strategy: {ghost['strategy']}")
-        for t, s in ghost['speed_profile']:
-            print(f" t={t:.1f}s -> speed={s:.2f} km/h")
-        print("-----------------------------\n")
-
     start_tcx_file(start_time)
 
     loop = asyncio.get_event_loop()
-    last_logged_distance = None  # for ghost update throttling
-    last_distance = 0.0  # to track the most recent treadmill distance
+    last_logged_distance = None
+    last_distance = 0.0
 
     def callback(sender, data):
         nonlocal last_logged_distance, last_distance
 
         speed, distance, incline, elapsed_time = parse_treadmill_data(data)
-        if incline is None:
-            incline = 0.0
-        if speed is None:
-            speed = 0.0
-        if distance is None:
-            distance = 0.0
-        if elapsed_time is None:
-            elapsed_time = 0.0
+        if incline is None: incline = 0.0
+        if speed is None: speed = 0.0
+        if distance is None: distance = 0.0
+        if elapsed_time is None: elapsed_time = 0.0
 
-        #print(f"[CB] Speed: {speed:.2f} km/h, Distance: {distance:.2f} km, Incline: {incline:.2f} %, Time: {elapsed_time:.1f}s")
         shared_state["elapsed_time"] = elapsed_time
-
-
+        shared_state["distance"] = distance
 
         loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
         loop.call_soon_threadsafe(speed_queue.put_nowait, speed)
@@ -559,13 +569,12 @@ async def exercise_routine(initial_speed, routine, video_path):
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
-        last_distance = distance  # Update the final known distance
+        last_distance = distance
 
         elapsed = (timestamp - start_time).total_seconds()
         user_distance_m = distance * 1000
-
-        # Throttle ghost gap updates by rounding distance to the nearest 0.1 meter
         distance_rounded = round(user_distance_m, 1)
+
         if last_logged_distance != distance_rounded:
             last_logged_distance = distance_rounded
             ghost_gaps = {}
@@ -578,41 +587,30 @@ async def exercise_routine(initial_speed, routine, video_path):
     print("[INFO] Starting treadmill monitoring...")
     await treadmill.start_monitoring(callback)
 
-    print("[INFO] Launching video task...")
-    video_task = asyncio.create_task(
-        play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal)
-    )
-
     try:
         print("[INFO] Starting routine segments...")
         for idx, (duration, speed_increment) in enumerate(routine):
-            print(f"[SEGMENT {idx}] Setting speed to {speed_increment:.2f} km/h for {duration:.1f} min")
+            print(f"[SEGMENT {idx}] Setting speed to {speed_increment:.2f} km/h for {duration:.1f} {'min' if routine_type == 'time' else 'km'}")
             await treadmill.set_speed(speed_increment)
 
-            print("[SEGMENT] Waiting for treadmill-reported segment start time...")
-            try:
-                segment_start_time = shared_state["elapsed_time"]
-                print(f"[SEGMENT] Segment started at treadmill time: {segment_start_time}s")
-            except asyncio.TimeoutError:
-                print("[ERROR] Timeout waiting for elapsed_time_queue (start of segment)")
-                break
-
-            target_time = segment_start_time + duration * 60
-            print(f"[SEGMENT] Target end time: {target_time}s")
+            if routine_type == "time":
+                segment_start = shared_state["elapsed_time"]
+                target = segment_start + duration * 60
+                print(f"[SEGMENT] Time-based: {segment_start:.1f}s → {target:.1f}s")
+            else:
+                segment_start = shared_state["distance"]
+                target = segment_start + duration
+                print(f"[SEGMENT] Distance-based: {segment_start:.2f}km → {target:.2f}km")
 
             while True:
                 await asyncio.sleep(0.2)
-                try:
-                    current_time = shared_state.get("elapsed_time", 0.0)
-                except asyncio.TimeoutError:
-                    print("[WARN] Waiting for treadmill time update...")
-                    continue
+                current = shared_state["elapsed_time"] if routine_type == "time" else shared_state["distance"]
 
-                print(f"[SEGMENT] Current treadmill time: {current_time:.1f}s / Target: {target_time:.1f}s")
                 if not exit_signal.empty():
                     print("[INFO] User exit detected.")
                     raise asyncio.CancelledError("User requested exit")
-                if current_time >= target_time:
+
+                if current >= target:
                     print("[SEGMENT] Segment complete.")
                     break
 
@@ -1015,8 +1013,9 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5, pb_times=None):
                 # PB Highlighting
                 if carousel_i == 2:
                     selected_routine = routines[routine_names[selections[0]]]
-                    total_duration = sum(d for d, _ in selected_routine)
-                    increments = [inc for _, inc in selected_routine]
+                    segments = selected_routine["segments"] if isinstance(selected_routine, dict) and "segments" in selected_routine else selected_routine
+                    total_duration = sum(d for d, _ in segments)
+                    increments = [inc for _, inc in segments]
                     avg_increment = sum(increments) / len(increments) if increments else 0
 
                     for dist_str, pb_time in pb_times.items():
@@ -1100,35 +1099,123 @@ def run_selection_ui(screen, routines, videos, start_speed=8.5, pb_times=None):
 [File] post_workout_stats.py
 --- Start of post_workout_stats.py ---
 import pygame
-from datetime import timedelta
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
+import os
+import json
 
-def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=None):
+TCX_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'TCX'))
+CONFIG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'user_config.json'))
+PB_DISTANCES = [1, 3, 5, 10, 21]  # in km
 
+def find_latest_tcx_file(directory):
+    try:
+        tcx_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.tcx')]
+        return max(tcx_files, key=os.path.getmtime) if tcx_files else None
+    except FileNotFoundError:
+        print(f"ERROR: TCX directory not found: {directory}")
+        return None
+
+def parse_tcx_trackpoints(tcx_filename):
+    tree = ET.parse(tcx_filename)
+    root = tree.getroot()
+    ns = {'ns': 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'}
+    trackpoints = root.findall('.//ns:Trackpoint', ns)
+
+    points = []
+    for tp in trackpoints:
+        dist_elem = tp.find('ns:DistanceMeters', ns)
+        time_elem = tp.find('ns:Time', ns)
+        if dist_elem is not None and time_elem is not None:
+            dist_km = float(dist_elem.text) / 1000
+            timestamp = datetime.fromisoformat(time_elem.text.replace("Z", "+00:00"))
+            points.append((timestamp, dist_km))
+    return points
+
+def load_user_config():
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {"pb_times_minutes": {}}
+
+def save_user_config(config):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+
+def check_for_pbs(trackpoints, user_config):
+    pb_updates = {}
+    pb_times = user_config.get("pb_times_minutes", {})
+    reached = set()
+
+    for i in range(1, len(trackpoints)):
+        t0, d0 = trackpoints[0]
+        ti, di = trackpoints[i]
+
+        for target_km in PB_DISTANCES:
+            if target_km in reached:
+                continue
+            if di >= target_km:
+                elapsed = (ti - t0).total_seconds() / 60  # minutes
+                prev_pb = pb_times.get(str(target_km), float('inf'))
+                if elapsed < prev_pb:
+                    print("new PB")
+                    pb_times[str(target_km)] = elapsed
+                    pb_updates[target_km] = elapsed
+                reached.add(target_km)
+
+    return pb_updates
+
+def show_post_workout_stats():
+    print("loading workout stats")
     pygame.init()
     screen = pygame.display.set_mode((800, 600), pygame.FULLSCREEN)
     pygame.display.set_caption("Workout Summary")
     font = pygame.font.Font(None, 48)
     small_font = pygame.font.Font(None, 36)
 
-    # Calculate stats
-    duration = end_time - start_time
-    total_seconds = duration.total_seconds()
-    total_minutes = total_seconds / 60
-    total_distance_km = workout_data[-1]["distance"] if workout_data else 0.0
-    avg_pace_min_per_km = total_minutes / total_distance_km if total_distance_km > 0 else 0
+    latest_tcx = find_latest_tcx_file(TCX_DIR)
+    if not latest_tcx:
+        lines = ["No TCX files found.", "", "Press any key to exit..."]
+    else:
+        points = parse_tcx_trackpoints(latest_tcx)
+        if not points:
+            lines = ["No valid data in TCX.", "", "Press any key to exit..."]
+        else:
+            start_time = points[0][0]
+            end_time = points[-1][0]
+            total_distance_km = points[-1][1]
+            duration = end_time - start_time
+            total_minutes = duration.total_seconds() / 60
+            avg_pace = total_minutes / total_distance_km if total_distance_km > 0 else 0
 
-    # Prepare text lines
-    lines = [
-        "Workout Summary",
-        f"Duration: {str(timedelta(seconds=int(total_seconds)))}",
-        f"Distance: {total_distance_km:.2f} km",
-        f"Avg Pace: {avg_pace_min_per_km:.2f} min/km",
-        "",
-        "Press any key to exit..."
-    ]
+            # Load config and check PBs
+            config = load_user_config()
+            pb_updates = check_for_pbs(points, config)
+            if pb_updates:
+                save_user_config(config)
 
+            # Summary + PB lines
+            lines = [
+                "Workout Summary",
+                f"Duration: {str(timedelta(seconds=int(duration.total_seconds())))}",
+                f"Distance: {total_distance_km:.2f} km",
+                f"Avg Pace: {avg_pace:.2f} min/km",
+                ""
+            ]
+            if pb_updates:
+                lines.append("🏆 New PBs:")
+                for dist in sorted(pb_updates.keys()):
+                    lines.append(f"  {dist} km: {pb_updates[dist]:.1f} min")
+            else:
+                lines.append("No PBs this time. Keep going!")
+
+            lines.append("")
+            lines.append("Press any key to exit...")
+
+    # Render screen
     screen.fill((0, 0, 0))
-    y = 100
+    y = 80
     for line in lines:
         text = font.render(line, True, (255, 255, 255)) if line else small_font.render(" ", True, (255, 255, 255))
         rect = text.get_rect(center=(screen.get_width() // 2, y))
@@ -1137,7 +1224,7 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
 
     pygame.display.flip()
 
-    # Wait for any key press
+    # Wait for any key
     waiting = True
     while waiting:
         for event in pygame.event.get():
@@ -1152,29 +1239,27 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
     --- Start of generate_zwo_thumbnail.py ---
     import os
     import sys
+    import json
     import xml.etree.ElementTree as ET
     import matplotlib.pyplot as plt
     from pathlib import Path
     import re
     
     def parse_zwo(file_path):
-        """
-        Parses a .zwo file and extracts workout segments and routine name.
-        Returns a tuple: (segments_list, routine_name)
-        """
         tree = ET.parse(file_path)
         root = tree.getroot()
     
-        # Extract routine name from <name> tag
+        # Extract name
         routine_name_elem = root.find('name')
-        if routine_name_elem is None or not routine_name_elem.text:
-            routine_name = file_path.stem  # fallback to filename stem
-        else:
-            routine_name = routine_name_elem.text.strip()
+        routine_name = routine_name_elem.text.strip() if routine_name_elem is not None else file_path.stem
+    
+        # Extract type
+        duration_type_elem = root.find('durationType')
+        routine_type = duration_type_elem.text.strip().lower() if duration_type_elem is not None else "time"
     
         workout = root.find('workout')
         if workout is None:
-            raise ValueError("No <workout> element found in the file.")
+            raise ValueError("No <workout> element found.")
     
         segments = []
         for elem in workout:
@@ -1197,40 +1282,24 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
                 on_power = float(attrib.get('OnPower', 0))
                 off_power = float(attrib.get('OffPower', 0))
                 for _ in range(repeat):
-                    segments.append({
-                        'type': 'Interval On',
-                        'duration': on_duration,
-                        'power': on_power
-                    })
-                    segments.append({
-                        'type': 'Interval Off',
-                        'duration': off_duration,
-                        'power': off_power
-                    })
+                    segments.append({'type': 'Interval On', 'duration': on_duration, 'power': on_power})
+                    segments.append({'type': 'Interval Off', 'duration': off_duration, 'power': off_power})
     
-        return segments, routine_name
+        return segments, routine_name, routine_type
     
     
     def parse_json_config(config):
-        """
-        Parses a JSON-like configuration and extracts workout segments.
-        Returns a list of segments with their type, duration, and power.
-        """
         segments = []
         for duration, power in config:
             segments.append({
                 'type': 'Interval',
-                'duration': duration * 60,  # Convert minutes to seconds
+                'duration': duration * 60,
                 'power': power
             })
         return segments
     
     
-    def plot_workout(segments, output_file):
-        """
-        Generates a workout chart from segments and saves it as an image.
-        Each segment is color-coded based on power intensity.
-        """
+    def plot_workout(segments, output_file, routine_type="time"):
         current_time = 0
         colors = []
     
@@ -1241,7 +1310,6 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
             else:
                 power = seg['power']
     
-            # Determine color based on power
             if power < 0.9:
                 color = 'green'
             elif power < 1.0:
@@ -1258,37 +1326,36 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
         for start, end, power, color in colors:
             plt.fill_between([start, end], 0, power, step='post', color=color, alpha=0.7)
     
+        # Labels
         plt.xlabel('Time (s)')
         plt.ylabel('Power (FTP)')
         plt.title('Workout Chart')
         plt.grid(True)
+    
+        # Add T or D label in top-right
+        label = "T" if routine_type == "time" else "D"
+        plt.text(0.98, 0.95, label, transform=plt.gca().transAxes,
+                 fontsize=30, fontweight='bold', color='gray',
+                 ha='right', va='top', alpha=0.5)
+    
         plt.tight_layout()
         plt.savefig(output_file)
         plt.close()
     
     
     def generate_thumbnail(zwo_path):
-        """
-        Generates a thumbnail image for a given .zwo file,
-        saving the output as {routine_name}.png, where routine_name
-        is extracted from the <name> tag inside the XML.
-        """
         zwo_file = Path(zwo_path)
         if not zwo_file.is_file() or zwo_file.suffix.lower() != '.zwo':
             print(f"Invalid .zwo file: {zwo_path}")
             return
     
         try:
-            segments, routine_name = parse_zwo(zwo_file)
+            segments, routine_name, routine_type = parse_zwo(zwo_file)
         except Exception as e:
             print(f"Failed to parse {zwo_file.name}: {e}")
             return
     
-        # Clean routine name for safe filename
         safe_name = re.sub(r'[^A-Za-z0-9_\- ]+', '', routine_name).strip()
-        if not safe_name:
-            safe_name = zwo_file.stem
-    
         thumbnail_path = Path(f"{safe_name}.png")
     
         if thumbnail_path.exists():
@@ -1296,53 +1363,69 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
             return
     
         try:
-            plot_workout(segments, thumbnail_path)
+            plot_workout(segments, thumbnail_path, routine_type)
             print(f"Thumbnail created: {thumbnail_path}")
         except Exception as e:
             print(f"Error generating thumbnail for {zwo_file.name}: {e}")
     
     
-    def generate_thumbnail_from_config(config, name):
-        """
-        Generates a thumbnail image from a JSON-like configuration.
-        """
+    def generate_thumbnail_from_config(config, name, routine_type):
         safe_name = re.sub(r'[^A-Za-z0-9_\- ]+', '', name).strip()
-        if not safe_name:
-            safe_name = name
-    
         thumbnail_path = Path(f"{safe_name}.png")
+    
         if thumbnail_path.exists():
             print(f"Thumbnail already exists: {thumbnail_path}")
             return
     
         try:
             segments = parse_json_config(config)
-            plot_workout(segments, thumbnail_path)
+            plot_workout(segments, thumbnail_path, routine_type)
             print(f"Thumbnail created: {thumbnail_path}")
         except Exception as e:
             print(f"Error processing {name}: {e}")
     
     
     def process_directory(directory):
-        """
-        Processes all .zwo files in the given directory.
-        """
         dir_path = Path(directory)
         for zwo_file in dir_path.glob('*.zwo'):
             generate_thumbnail(zwo_file)
     
     
+    def load_routines_json():
+        routines_path = Path(__file__).parent.parent / "Routines.json"
+        if not routines_path.exists():
+            print(f"Routines.json not found at {routines_path}")
+            return {}
+    
+        try:
+            with open(routines_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error reading Routines.json: {e}")
+            return {}
+    
+    
     if __name__ == "__main__":
         if len(sys.argv) > 1:
-            # Called with a specific .zwo file
             generate_thumbnail(sys.argv[1])
         else:
-            # No arguments; process all .zwo files in current directory
             process_directory('.')
     
-            # Example JSON-like configurations
-            workout_configs = {
-        "Basic_pillars": [
+            # Load and process JSON routines from ../Routines.json
+            routines = load_routines_json()
+            for name, conf in routines.items():
+                routine_type = conf.get("type", "time")
+                segments = conf.get("segments", [])
+                if segments:
+                    generate_thumbnail_from_config(segments, name, routine_type)
+    --- End of generate_zwo_thumbnail.py ---
+
+[File] routines.json
+--- Start of routines.json ---
+{
+    "Basic_pillars": {
+        "type": "time",
+        "segments": [
             [5, 0],
             [5, 0.5],
             [4, 0],
@@ -1353,8 +1436,11 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
             [2, 2.0],
             [1, 0],
             [1, 2.5]
-        ],
-        "long_pillars": [
+        ]
+    },
+    "long_pillars": {
+        "type": "time",
+        "segments": [
             [6, 0],
             [6, 0.5],
             [5, 0],
@@ -1367,8 +1453,11 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
             [2, 2.5],
             [1, 0],
             [2, 3]
-        ],
-        "Pillars_Buffer": [
+        ]
+    },
+    "Pillars_Buffer": {
+        "type": "time",
+        "segments": [
             [3.5, 0.5],
             [5, 0.0],
             [5, 0.5],
@@ -1380,88 +1469,59 @@ def show_post_workout_stats(workout_data, start_time, end_time, tcx_filename=Non
             [2, 2.0],
             [1, 0],
             [1, 2.5]
-        ],
-        "Test": [
-            [0.1, 0.5],
-            [0.2, 0.0],
-            [0.1, 0.5],
-            [0.2, 0],
-            [4, 1.0],
+        ]
+    },
+    "Testtime": {
+        "type": "time",
+        "segments": [
+            [0.5, 0.5],
+            [0.5, 0.0],
+            [0.5, 0.5],
+            [0.5, 0],
+            [1, 1.0],
             [3, 0],
             [3, 1.5],
             [2, 0],
             [2, 2.0],
             [1, 0],
             [1, 2.5]
-        ],
-        "plain run": [
-            [40, 0]
+        ]
+    },
+    "Testdist": {
+        "type": "distance",
+        "segments": [
+            [0.1, 0.5],
+            [0.1, 0.0],
+            [0.5, 0.5],
+            [0.5, 0],
+            [1, 1.0],
+            [3, 0],
+            [3, 1.5],
+            [2, 0],
+            [2, 2.0],
+            [1, 0],
+            [1, 2.5]
+        ]
+    },
+    "5k": {
+        "type": "distance",
+        "segments": [
+            [5, 0]
+        ]
+    },
+    "10k": {
+        "type": "distance",
+        "segments": [
+            [10, 0]
+        ]
+    },
+    "3k": {
+        "type": "distance",
+        "segments": [
+            [3, 0]
         ]
     }
     
-    
-            for name, config in workout_configs.items():
-                generate_thumbnail_from_config(config, name)
-    --- End of generate_zwo_thumbnail.py ---
-
-[File] routines.json
---- Start of routines.json ---
-{
-    "Basic_pillars": [
-        [5, 0],
-        [5, 0.5],
-        [4, 0],
-        [4, 1.0],
-        [3, 0],
-        [3, 1.5],
-        [2, 0],
-        [2, 2.0],
-        [1, 0],
-        [1, 2.5]
-    ],
-    "long_pillars": [
-        [6, 0],
-        [6, 0.5],
-        [5, 0],
-        [5, 1.0],
-        [4, 0],
-        [4, 1.5],
-        [3, 0],
-        [3, 2.0],
-        [2, 0],
-        [2, 2.5],
-        [1, 0],
-        [2, 3]
-    ],
-    "Pillars_Buffer": [
-        [3.5, 0.5],
-        [5, 0.0],
-        [5, 0.5],
-        [4, 0],
-        [4, 1.0],
-        [3, 0],
-        [3, 1.5],
-        [2, 0],
-        [2, 2.0],
-        [1, 0],
-        [1, 2.5]
-    ],
-    "Test": [
-        [0.5, 0.5],
-        [0.5, 0.0],
-        [0.5, 0.5],
-        [0.5, 0],
-        [1, 1.0],
-        [3, 0],
-        [3, 1.5],
-        [2, 0],
-        [2, 2.0],
-        [1, 0],
-        [1, 2.5]
-    ],
-    "plain run": [
-        [40, 0]
-    ]
 }
 --- End of routines.json ---
 
@@ -1664,6 +1724,12 @@ class TreadmillControl:
     async def decrease_speed(self):
         await self.set_speed(self.current_speed - 0.5)
 
+    async def start_or_resume(self):
+            if self.testing:
+                print("Simulated FTMS start/resume command.")
+                return
+            await self.client.write_gatt_char(control_point_uuid, bytearray([0x07]))
+            await self.wait_for_response()
 
 def parse_treadmill_data(data: bytes):
     flags = int.from_bytes(data[0:2], byteorder='little')
@@ -1751,6 +1817,8 @@ def parse_treadmill_data(data: bytes):
     #print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
 
     return values
+
+    
 --- End of treadmill_control.py ---
 
 [File] treadmill_log.json
@@ -2455,6 +2523,10 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
 
     screen_width, screen_height = get_screen_resolution()
 
+    # Create fullscreen window once
+    cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty("Video", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -2480,24 +2552,26 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         except asyncio.QueueEmpty:
             pass
 
-        # HUD
+        # HUD: Speed
         hud_speed_text = f"{last_known_speed:.1f} km/h"
         cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
+        # HUD: Distance
         hud_distance_text = f"{last_known_distance:.2f} km"
         (text_width, text_height), _ = cv2.getTextSize(hud_distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         cv2.putText(frame, hud_distance_text, (frame.shape[1] - text_width - 10, text_height + 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
+
+        # HUD: Elapsed Time
         try:
             elapsed_time_seconds = elapsed_time_queue.get_nowait()
         except asyncio.QueueEmpty:
-            pass  # use last known value
+            pass
         hud_time_text = f"Time: {int(elapsed_time_seconds // 60)}:{int(elapsed_time_seconds % 60):02d}"
-
         cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
+        # HUD: Ghost Gaps
         if last_ghost_gaps:
             y_offset = frame.shape[0] - 30
             for name, gap in sorted(last_ghost_gaps.items(), reverse=True):
@@ -2509,6 +2583,7 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
                 y_offset -= 25
             ghost_runner_hud.draw_ghost_runners(frame, last_ghost_gaps)
 
+        # Exit Confirmation Overlay
         if confirm_exit:
             overlay = frame.copy()
             cv2.rectangle(overlay, (200, 200), (600, 400), (0, 0, 0), -1)
@@ -2517,12 +2592,10 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
             alpha = 0.7
             cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
-        # Resize to screen resolution before displaying
+        # Resize to screen resolution
         frame = cv2.resize(frame, (screen_width, screen_height))
 
-        # Display
-        cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Video", screen_width, screen_height)
+        # Show frame
         cv2.imshow("Video", frame)
 
         key = cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF
@@ -2690,6 +2763,9 @@ def parse_zwo_file(file_path, starting_speed):
     root = tree.getroot()
 
     routine_name = root.find('name').text.strip()
+    duration_type_elem = root.find('durationType')
+    duration_type = duration_type_elem.text.strip().lower() if duration_type_elem is not None else "time"
+
     routine = []
 
     for block in root.find('workout'):
@@ -2707,7 +2783,7 @@ def parse_zwo_file(file_path, starting_speed):
         speed_increment = target_speed - starting_speed
         routine.append((duration_min, speed_increment))
 
-    return {routine_name: routine}
+    return {routine_name: {"type": duration_type, "segments": routine}}
 
 def load_all_zwo_routines(folder_path, starting_speed):
     """

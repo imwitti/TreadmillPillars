@@ -4,6 +4,7 @@ from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
 from virtual_competitors import generate_competitors_with_profiles
 from datetime import datetime
+from tcx_postprocess import post_process_tcx_with_gpx
 
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
@@ -142,14 +143,24 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         print("[INFO] Workout interrupted by user.")
     finally:
         print("[INFO] Cleaning up...")
-        await treadmill.stop_monitoring()
-        await treadmill.disconnect()
+
         await video_task
 
         end_time = datetime.utcnow()
         final_distance = last_distance
-        finalize_tcx_file(start_time, end_time, final_distance)
+        finalize_tcx_file()
+        # Derive GPX path from video filename
+        finalize_tcx_file()
 
+        video_basename = os.path.splitext(os.path.basename(video_path))[0]
+        video_dir = os.path.dirname(video_path)
+        gpx_file = os.path.join(video_dir, f"{video_basename}.gpx")
+
+        if os.path.exists(gpx_file):
+            print(f"[INFO] Found GPX route at {gpx_file}, post-processing TCX...")
+            post_process_tcx_with_gpx(tcx_filename, gpx_file)
+        else:
+            print(f"[WARN] No GPX route found at {gpx_file}, skipping post-processing.")
         print("[INFO] Workout complete.")
         return {
             "start_time": start_time,
