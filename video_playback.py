@@ -104,7 +104,9 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         # Show frame
         cv2.imshow("Video", frame)
 
-        key = cv2.waitKey(int(1000 / (30 * speed_ratio))) & 0xFF
+        safe_ratio = max(speed_ratio, 0.1)  # prevent zero or too slow
+        key = cv2.waitKey(int(1000 / (30 * safe_ratio))) & 0xFF
+
 
         if not confirm_exit and key in [27, 8, 38]:  # ESC or BACK
             confirm_exit = True

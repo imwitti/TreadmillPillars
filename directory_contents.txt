@@ -20,6 +20,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 0a/
         [Folder] 0d/
         [Folder] 0e/
+        [Folder] 0f/
         [Folder] 11/
         [Folder] 12/
         [Folder] 13/
@@ -105,6 +106,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 86/
         [Folder] 89/
         [Folder] 8a/
+        [Folder] 8b/
         [Folder] 8c/
         [Folder] 8f/
         [Folder] 90/
@@ -173,6 +175,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] ec/
         [Folder] ed/
         [Folder] ee/
+        [Folder] ef/
         [Folder] f0/
         [Folder] f2/
         [Folder] f3/
@@ -480,6 +483,7 @@ from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
 from virtual_competitors import generate_competitors_with_profiles
 from datetime import datetime
+from tcx_postprocess import post_process_tcx_with_gpx
 
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
@@ -618,14 +622,24 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         print("[INFO] Workout interrupted by user.")
     finally:
         print("[INFO] Cleaning up...")
-        await treadmill.stop_monitoring()
-        await treadmill.disconnect()
+
         await video_task
 
         end_time = datetime.utcnow()
         final_distance = last_distance
-        finalize_tcx_file(start_time, end_time, final_distance)
+        finalize_tcx_file()
+        # Derive GPX path from video filename
+        finalize_tcx_file()
 
+        video_basename = os.path.splitext(os.path.basename(video_path))[0]
+        video_dir = os.path.dirname(video_path)
+        gpx_file = os.path.join(video_dir, f"{video_basename}.gpx")
+
+        if os.path.exists(gpx_file):
+            print(f"[INFO] Found GPX route at {gpx_file}, post-processing TCX...")
+            post_process_tcx_with_gpx(tcx_filename, gpx_file)
+        else:
+            print(f"[WARN] No GPX route found at {gpx_file}, skipping post-processing.")
         print("[INFO] Workout complete.")
         return {
             "start_time": start_time,
@@ -1528,62 +1542,195 @@ def show_post_workout_stats():
 [File] tcx_incremental.py
 --- Start of tcx_incremental.py ---
 import os
-import xml.etree.ElementTree as ET
 from datetime import datetime
 
-# Global variables to hold the TCX tree and file path
-tcx_tree = None
-tcx_root = None
-tcx_track = None
+# TCX and TPX namespaces
+NS_TCX = "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
+NS_TPX = "http://www.garmin.com/xmlschemas/ActivityExtension/v2"
+
 tcx_filename = None
+track_file = None
+start_iso = None
+lap_data = {
+    'start_time': None,
+    'last_time': None,
+    'total_distance_km': 0.0
+}
 
-def start_tcx_file(start_time):
-    global tcx_tree, tcx_root, tcx_track, tcx_filename
-
-    tcx_root = ET.Element("TrainingCenterDatabase", xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2")
-    activities = ET.SubElement(tcx_root, "Activities")
-    activity = ET.SubElement(activities, "Activity", Sport="Running")
-    ET.SubElement(activity, "Id").text = start_time.isoformat()
-
-    lap = ET.SubElement(activity, "Lap", StartTime=start_time.isoformat())
-    ET.SubElement(lap, "TotalTimeSeconds").text = "0"
-    ET.SubElement(lap, "DistanceMeters").text = "0"
-    ET.SubElement(lap, "Calories").text = "0"
-    ET.SubElement(lap, "Intensity").text = "Active"
-    ET.SubElement(lap, "TriggerMethod").text = "Manual"
-
-    tcx_track = ET.SubElement(lap, "Track")
-    tcx_tree = ET.ElementTree(tcx_root)
+def start_tcx_file(start_time: datetime):
+    global tcx_filename, track_file, start_iso, lap_data
 
     os.makedirs("TCX", exist_ok=True)
     tcx_filename = f"TCX/workout_{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.tcx"
-    tcx_tree.write(tcx_filename, encoding="utf-8", xml_declaration=True)
+    start_iso = start_time.isoformat()
+    lap_data['start_time'] = start_time
 
-def append_tcx_trackpoint(timestamp, speed, distance, incline):
-    global tcx_tree, tcx_track, tcx_filename
+    with open(tcx_filename, 'w', encoding='utf-8') as f:
+        f.write(f'''<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="{NS_TCX}" xmlns:ns3="{NS_TPX}">
+  <Activities>
+    <Activity Sport="Running">
+      <Id>{start_iso}</Id>
+      <Lap StartTime="{start_iso}">
+        <TotalTimeSeconds>0</TotalTimeSeconds>
+        <DistanceMeters>0</DistanceMeters>
+        <Calories>0</Calories>
+        <Intensity>Active</Intensity>
+        <TriggerMethod>Manual</TriggerMethod>
+        <Track>
+''')
 
-    trackpoint = ET.SubElement(tcx_track, "Trackpoint")
-    ET.SubElement(trackpoint, "Time").text = timestamp.isoformat()
-    ET.SubElement(trackpoint, "DistanceMeters").text = str(distance * 1000)
+    track_file = open(tcx_filename, 'a', encoding='utf-8')
 
-    extensions = ET.SubElement(trackpoint, "Extensions")
-    tpx = ET.SubElement(extensions, "TPX", xmlns="http://www.garmin.com/xmlschemas/ActivityExtension/v2")
-    ET.SubElement(tpx, "Speed").text = str(speed / 3.6)
+def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: float, incline_percent: float):
+    global track_file, lap_data
 
-    # Save the updated tree incrementally
-    tcx_tree.write(tcx_filename, encoding="utf-8", xml_declaration=True)
+    time_iso = timestamp.isoformat()
+    speed_mps = speed_kmh / 3.6
+    dist_m = distance_km * 1000
 
-def finalize_tcx_file(start_time, end_time, final_distance):
-    global tcx_tree, tcx_root, tcx_filename
+    # Update lap stats
+    lap_data['last_time'] = timestamp
+    lap_data['total_distance_km'] = max(lap_data['total_distance_km'], distance_km)
 
-    lap = tcx_root.find(".//{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Lap")
-    if lap is not None:
-        lap.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}TotalTimeSeconds").text = str((end_time - start_time).total_seconds())
-        lap.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}DistanceMeters").text = str(final_distance * 1000)
+    track_file.write(f'''    <Trackpoint>
+      <Time>{time_iso}</Time>
+      <DistanceMeters>{dist_m:.2f}</DistanceMeters>
+      <Extensions>
+        <ns3:TPX>
+          <ns3:Speed>{speed_mps:.3f}</ns3:Speed>
+          <ns3:Incline>{incline_percent:.2f}</ns3:Incline>
+        </ns3:TPX>
+      </Extensions>
+    </Trackpoint>
+''')
 
-    tcx_tree.write(tcx_filename, encoding="utf-8", xml_declaration=True)
-    print(f"Workout data saved incrementally to {tcx_filename}")
+def finalize_tcx_file():
+    global tcx_filename, track_file, lap_data
+
+    # Finish the <Track> and patch lap summary
+    track_file.write(f'''    </Track>
+        <TotalTimeSeconds>{(lap_data['last_time'] - lap_data['start_time']).total_seconds():.1f}</TotalTimeSeconds>
+        <DistanceMeters>{lap_data['total_distance_km'] * 1000:.1f}</DistanceMeters>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>
+''')
+    track_file.close()
+    print(f"✅ TCX file written: {tcx_filename}")
 --- End of tcx_incremental.py ---
+
+[File] tcx_postprocess.py
+--- Start of tcx_postprocess.py ---
+import xml.etree.ElementTree as ET
+from datetime import datetime
+from geopy.distance import geodesic
+import os
+
+GPX_NS = {'gpx': 'http://www.topografix.com/GPX/1/1'}
+TCX_NS = {'tcx': 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'}
+ET.register_namespace('', TCX_NS['tcx'])
+
+def load_gpx_route_with_distances(gpx_file):
+    tree = ET.parse(gpx_file)
+    root = tree.getroot()
+
+    route = []
+    prev_point = None
+    total_dist = 0.0
+
+    for trkpt in root.findall('.//gpx:trkpt', GPX_NS):
+        lat = float(trkpt.attrib['lat'])
+        lon = float(trkpt.attrib['lon'])
+        ele_elem = trkpt.find('gpx:ele', GPX_NS)
+        ele = float(ele_elem.text) if ele_elem is not None else 0.0
+        point = (lat, lon)
+
+        if prev_point is not None:
+            seg_dist = geodesic(prev_point, point).meters
+            total_dist += seg_dist
+        route.append({'lat': lat, 'lon': lon, 'ele': ele, 'cum_dist': total_dist})
+        prev_point = point
+
+    return route
+
+def interpolate_route_point(route, target_dist):
+    """
+    Given a cumulative distance, interpolate lat, lon, ele along the route.
+    """
+    for i in range(1, len(route)):
+        if route[i]['cum_dist'] >= target_dist:
+            r0 = route[i - 1]
+            r1 = route[i]
+            dist_diff = r1['cum_dist'] - r0['cum_dist']
+            if dist_diff == 0:
+                frac = 0
+            else:
+                frac = (target_dist - r0['cum_dist']) / dist_diff
+
+            lat = r0['lat'] + frac * (r1['lat'] - r0['lat'])
+            lon = r0['lon'] + frac * (r1['lon'] - r0['lon'])
+            ele = r0['ele'] + frac * (r1['ele'] - r0['ele'])
+            return lat, lon, ele
+
+    # If target_dist beyond route end, return last point
+    return route[-1]['lat'], route[-1]['lon'], route[-1]['ele']
+
+def post_process_tcx_with_gpx(tcx_file_path, gpx_file_path, output_file_path=None):
+    if output_file_path is None:
+        output_file_path = tcx_file_path  # overwrite by default
+
+    print(f"[INFO] Loading GPX route from {gpx_file_path}...")
+    route = load_gpx_route_with_distances(gpx_file_path)
+
+    print(f"[INFO] Parsing TCX file {tcx_file_path}...")
+    tree = ET.parse(tcx_file_path)
+    root = tree.getroot()
+
+    trackpoints = root.findall('.//tcx:Trackpoint', TCX_NS)
+    print(f"[INFO] Found {len(trackpoints)} trackpoints in TCX.")
+
+    updated_count = 0
+    for tp in trackpoints:
+        dist_elem = tp.find('tcx:DistanceMeters', TCX_NS)
+        if dist_elem is None:
+            continue
+        try:
+            dist_m = float(dist_elem.text)
+        except Exception:
+            continue
+
+        lat, lon, ele = interpolate_route_point(route, dist_m)
+
+        # Find or create Position element
+        pos_elem = tp.find('tcx:Position', TCX_NS)
+        if pos_elem is None:
+            pos_elem = ET.SubElement(tp, f"{{{TCX_NS['tcx']}}}Position")
+
+        lat_elem = pos_elem.find('tcx:LatitudeDegrees', TCX_NS)
+        if lat_elem is None:
+            lat_elem = ET.SubElement(pos_elem, f"{{{TCX_NS['tcx']}}}LatitudeDegrees")
+        lat_elem.text = f"{lat:.6f}"
+
+        lon_elem = pos_elem.find('tcx:LongitudeDegrees', TCX_NS)
+        if lon_elem is None:
+            lon_elem = ET.SubElement(pos_elem, f"{{{TCX_NS['tcx']}}}LongitudeDegrees")
+        lon_elem.text = f"{lon:.6f}"
+
+        # Find or create AltitudeMeters
+        alt_elem = tp.find('tcx:AltitudeMeters', TCX_NS)
+        if alt_elem is None:
+            alt_elem = ET.SubElement(tp, f"{{{TCX_NS['tcx']}}}AltitudeMeters")
+        alt_elem.text = f"{ele:.1f}"
+
+        updated_count += 1
+
+    print(f"[INFO] Updated {updated_count} trackpoints with GPS data.")
+
+    tree.write(output_file_path, encoding='utf-8', xml_declaration=True)
+    print(f"[INFO] Saved enriched TCX to {output_file_path}")
+--- End of tcx_postprocess.py ---
 
 [File] treadmill_control.py
 --- Start of treadmill_control.py ---

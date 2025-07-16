@@ -5,7 +5,7 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
     strategies = ["even", "positive_split", "negative_split", "mid_surge", "random"]
     competitors = []
     for i in range(num_competitors):
-        variation = random.uniform(-0.05, 0.05)  # ±5% duration variation
+        variation = random.uniform(-0.025, 0.025)  # ±5% duration variation
         comp_time = user_duration_min * (1 + variation)
         comp_avg_speed = user_avg_speed * (user_duration_min / comp_time)  # Adjust speed to match new time
         strategy = random.choice(strategies)
