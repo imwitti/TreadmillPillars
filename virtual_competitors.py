@@ -5,9 +5,9 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
     strategies = ["even", "positive_split", "negative_split", "mid_surge", "random"]
     competitors = []
     for i in range(num_competitors):
-        variation = random.uniform(-0.025, 0.025)  # ±5% duration variation
+        variation = random.uniform(-0.025, 0.025)  # ±2.5% duration variation
         comp_time = user_duration_min * (1 + variation)
-        comp_avg_speed = user_avg_speed * (user_duration_min / comp_time)  # Adjust speed to match new time
+        comp_avg_speed = user_avg_speed * (user_duration_min / comp_time)  # Maintain same distance
         strategy = random.choice(strategies)
         competitors.append({
             "name": f"Ghost {chr(65+i)}",
@@ -16,6 +16,11 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
             "strategy": strategy
         })
     return competitors
+
+def normalize_speed_profile(speed_profile, target_avg):
+    total = sum(speed for _, speed in speed_profile)
+    scale = target_avg * len(speed_profile) / total
+    return [(t, speed * scale) for t, speed in speed_profile]
 
 def generate_speed_profile(duration_min, avg_speed, strategy):
     segments = 10
@@ -42,28 +47,47 @@ def generate_speed_profile(duration_min, avg_speed, strategy):
             speed = random.uniform(avg_speed * 0.8, avg_speed * 1.2)
             speed_profile.append((i * segment_duration, speed))
 
-    return speed_profile
+    return normalize_speed_profile(speed_profile, avg_speed)
+
+def compute_total_distance(speed_profile, segment_duration_sec):
+    total = 0.0
+    for _, speed in speed_profile:
+        total += speed * (segment_duration_sec / 3600.0)  # Convert to km
+    return total
 
 def generate_competitors_with_profiles(user_duration_min, user_avg_speed, num_competitors=3):
     competitors = generate_competitor_profiles(user_duration_min, user_avg_speed, num_competitors)
     for competitor in competitors:
-        competitor["speed_profile"] = generate_speed_profile(
-            competitor["duration_min"],
-            competitor["avg_speed"],
-            competitor["strategy"]
-        )
+        duration_min = competitor["duration_min"]
+        strategy = competitor["strategy"]
+        avg_speed = competitor["avg_speed"]
+        speed_profile = generate_speed_profile(duration_min, avg_speed, strategy)
+        competitor["speed_profile"] = speed_profile
     return competitors
 
 if __name__ == "__main__":
-    user_duration_min = 30
-    user_avg_speed = 10.0
+    user_duration_min = 33
+    user_avg_speed = 10.0  # km/h
+    user_distance = user_avg_speed * (user_duration_min / 60.0)
+
     competitors = generate_competitors_with_profiles(user_duration_min, user_avg_speed)
+
+    print(f"User target: {user_duration_min:.2f} min, Distance: {user_distance:.2f} km\n")
+
     for competitor in competitors:
-        print(f"Competitor: {competitor['name']}")
-        print(f"Duration: {competitor['duration_min']:.2f} min")
-        print(f"Average Speed: {competitor['avg_speed']:.2f} km/h")
-        print(f"Strategy: {competitor['strategy']}")
-        print("Speed Profile:")
-        for timestamp, speed in competitor["speed_profile"]:
-            print(f"{str(timedelta(seconds=timestamp))} — {speed:.2f} km/h")
+        name = competitor["name"]
+        duration = competitor["duration_min"]
+        avg_speed = competitor["avg_speed"]
+        strategy = competitor["strategy"]
+        speed_profile = competitor["speed_profile"]
+        segment_duration = (duration * 60) / len(speed_profile)
+        total_distance = compute_total_distance(speed_profile, segment_duration)
+
+        print(f"Competitor: {name}")
+        print(f"  Strategy: {strategy}")
+        print(f"  Target Duration: {duration:.2f} min")
+        print(f"  Target Distance: {total_distance:.2f} km")
+        print("  Speed Profile:")
+        for timestamp, speed in speed_profile:
+            print(f"    {str(timedelta(seconds=timestamp))} — {speed:.2f} km/h")
         print()
