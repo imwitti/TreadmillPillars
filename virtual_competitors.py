@@ -18,9 +18,10 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
         })
     return competitors
 
-def normalize_speed_profile(speed_profile, target_avg):
-    total = sum(speed for _, speed in speed_profile)
-    scale = target_avg * len(speed_profile) / total
+def normalize_speed_profile(speed_profile, target_avg, segment_duration_sec):
+    total_distance = compute_total_distance(speed_profile, segment_duration_sec)
+    expected_distance = target_avg * (segment_duration_sec * len(speed_profile) / 3600.0)
+    scale = expected_distance / total_distance
     return [(t, speed * scale) for t, speed in speed_profile]
 
 def generate_speed_profile(duration_min, avg_speed, strategy):
@@ -48,7 +49,7 @@ def generate_speed_profile(duration_min, avg_speed, strategy):
             speed = random.uniform(avg_speed * 0.8, avg_speed * 1.2)
             speed_profile.append((i * segment_duration, speed))
 
-    return normalize_speed_profile(speed_profile, avg_speed)
+    return normalize_speed_profile(speed_profile, avg_speed, segment_duration)
 
 def compute_total_distance(speed_profile, segment_duration_sec):
     total = 0.0
