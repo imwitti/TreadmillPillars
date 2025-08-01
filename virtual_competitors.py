@@ -8,6 +8,7 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
         variation = random.uniform(-0.025, 0.025)  # ±2.5% duration variation
         comp_time = user_duration_min * (1 + variation)
         comp_avg_speed = user_avg_speed * (user_duration_min / comp_time)  # Maintain same distance
+        print(f"A ghost time is: {comp_time:.2f} min, with expected average speed of: {comp_avg_speed:.2f} km\n")
         strategy = random.choice(strategies)
         competitors.append({
             "name": f"Ghost {chr(65+i)}",
@@ -61,8 +62,20 @@ def generate_competitors_with_profiles(user_duration_min, user_avg_speed, num_co
         duration_min = competitor["duration_min"]
         strategy = competitor["strategy"]
         avg_speed = competitor["avg_speed"]
+
         speed_profile = generate_speed_profile(duration_min, avg_speed, strategy)
         competitor["speed_profile"] = speed_profile
+
+        # ➕ Add time difference to name
+        time_diff_sec = (duration_min - user_duration_min) * 60
+        if abs(time_diff_sec) < 1:
+            delta_str = "±0s"
+        elif time_diff_sec > 0:
+            delta_str = f"+{int(round(time_diff_sec))}s"
+        else:
+            delta_str = f"{int(round(time_diff_sec))}s"
+
+        competitor["name"] = f"{competitor['name']} ({delta_str})"
     return competitors
 
 if __name__ == "__main__":

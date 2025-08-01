@@ -1,4 +1,5 @@
 import asyncio
+import os
 from treadmill_control import TreadmillControl, parse_treadmill_data
 from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
@@ -87,10 +88,20 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         shared_state["elapsed_time"] = elapsed_time
         shared_state["distance"] = distance
 
-        loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
-        loop.call_soon_threadsafe(speed_queue.put_nowait, speed)
-        loop.call_soon_threadsafe(distance_queue.put_nowait, distance)
-        loop.call_soon_threadsafe(elapsed_time_queue.put_nowait, elapsed_time)
+        def safe_put(q, val):
+            try:
+                q.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                q.put_nowait(val)
+            except asyncio.QueueFull:
+                pass  # ignore if race condition still fills it
+
+        loop.call_soon_threadsafe(safe_put, speed_ratio_queue, speed / initial_speed if initial_speed > 0 else 1.0)
+        loop.call_soon_threadsafe(safe_put, speed_queue, speed)
+        loop.call_soon_threadsafe(safe_put, distance_queue, distance)
+        loop.call_soon_threadsafe(safe_put, elapsed_time_queue, elapsed_time)
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
@@ -150,7 +161,7 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         final_distance = last_distance
         finalize_tcx_file()
         # Derive GPX path from video filename
-        finalize_tcx_file()
+        
 
         video_basename = os.path.splitext(os.path.basename(video_path))[0]
         video_dir = os.path.dirname(video_path)
