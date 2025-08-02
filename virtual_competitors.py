@@ -76,7 +76,8 @@ def generate_competitors_with_profiles(user_duration_min, user_avg_speed, num_co
         else:
             delta_str = f"{int(round(time_diff_sec))}s"
 
-        competitor["name"] = f"{competitor['name']} ({delta_str})"
+        competitor["base_name"] = competitor["name"]
+
     return competitors
 
 if __name__ == "__main__":

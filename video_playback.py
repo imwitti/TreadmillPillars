@@ -77,17 +77,40 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # HUD: Ghost Gaps
+        # HUD: Ghost Gaps (split left/right)
         if last_ghost_gaps:
-            y_offset = frame.shape[0] - 30
-            for name, gap in sorted(last_ghost_gaps.items(), reverse=True):
+            left_labels = []
+            right_labels = []
+
+            for name, gap in last_ghost_gaps.items():
+                if name.startswith("PB") or name.startswith("Goal"):
+                    left_labels.append((name, gap))
+                else:
+                    right_labels.append((name, gap))
+
+            
+            # Draw left-aligned labels (above time label)
+            y_offset_left = frame.shape[0] - 60  # 30 for time label + 30 buffer
+            for name, gap in sorted(left_labels, key=lambda x: x[1], reverse=True):
+                gap_text = f"{name}: {'+' if gap >= 0 else ''}{gap:.1f} m"
+                cv2.putText(frame, gap_text, (10, y_offset_left),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                y_offset_left -= 25
+
+
+
+            # Draw right-aligned labels
+            y_offset_right = frame.shape[0] - 30
+            for name, gap in sorted(right_labels, key=lambda x: x[1], reverse=True):
                 gap_text = f"{name}: {'+' if gap >= 0 else ''}{gap:.1f} m"
                 (text_width, _), _ = cv2.getTextSize(gap_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
                 x_position = frame.shape[1] - text_width - 10
-                cv2.putText(frame, gap_text, (x_position, y_offset),
+                cv2.putText(frame, gap_text, (x_position, y_offset_right),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-                y_offset -= 25
+                y_offset_right -= 25
+
             ghost_runner_hud.draw_ghost_runners(frame, last_ghost_gaps)
+
 
         # Exit Confirmation Overlay
         if confirm_exit:

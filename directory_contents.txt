@@ -56,6 +56,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 3f/
         [Folder] 40/
         [Folder] 42/
+        [Folder] 43/
         [Folder] 44/
         [Folder] 46/
         [Folder] 48/
@@ -71,6 +72,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 55/
         [Folder] 56/
         [Folder] 58/
+        [Folder] 59/
         [Folder] 5b/
         [Folder] 5c/
         [Folder] 5d/
@@ -119,6 +121,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 9b/
         [Folder] 9d/
         [Folder] 9e/
+        [Folder] a0/
         [Folder] a1/
         [Folder] a2/
         [Folder] a3/
@@ -185,6 +188,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] f6/
         [Folder] f8/
         [Folder] f9/
+        [Folder] fb/
         [Folder] fc/
         [Folder] fd/
         [Folder] fe/
@@ -481,6 +485,7 @@ if __name__ == "__main__":
 [File] RunRoutine.py
 --- Start of RunRoutine.py ---
 import asyncio
+import os
 from treadmill_control import TreadmillControl, parse_treadmill_data
 from video_playback import play_video
 from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
@@ -502,8 +507,34 @@ def simulate_ghost_distance(speed_profile, elapsed_seconds):
             break
     return distance * 1000  # meters
 
+def get_current_ghost_speed(speed_profile, elapsed_seconds):
+    for i in range(len(speed_profile) - 1):
+        t0, s0 = speed_profile[i]
+        t1, s1 = speed_profile[i + 1]
+        if t0 <= elapsed_seconds < t1:
+            ratio = (elapsed_seconds - t0) / (t1 - t0)
+            return s0 + ratio * (s1 - s0)
+    return speed_profile[-1][1]  # fallback to last speed
 
 async def exercise_routine(initial_speed, routine_type, routine, video_path):
+    import json
+
+    def load_user_config(config_path='user_config.json'):
+        try:
+            with open(config_path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def get_current_ghost_speed(speed_profile, elapsed_seconds):
+        for i in range(len(speed_profile) - 1):
+            t0, s0 = speed_profile[i]
+            t1, s1 = speed_profile[i + 1]
+            if t0 <= elapsed_seconds < t1:
+                ratio = (elapsed_seconds - t0) / (t1 - t0)
+                return s0 + ratio * (s1 - s0)
+        return speed_profile[-1][1]
+
     shared_state = {"elapsed_time": 0.0, "distance": 0.0}
     treadmill = TreadmillControl()
     await treadmill.connect()
@@ -532,13 +563,9 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         )
     )
 
-    # Wait briefly to allow video first frame to appear
     await asyncio.sleep(2.0)
-
     print("[INFO] Sending FTMS 'Start or Resume' command...")
     await treadmill.start_or_resume()
-
-
     print("[INFO] Waiting for treadmill's 5-second countdown...")
     await asyncio.sleep(5)
 
@@ -550,7 +577,28 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     total_minutes = sum(duration for duration, _ in routine)
     total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
     avg_speed = total_distance_km / (total_minutes / 60)
+
+    # Load user config and generate ghost runners
+    user_config = load_user_config()
+    pb_times = user_config.get("pb_times_minutes", {})
+    goal_times = user_config.get("goal_times_minutes", {})
+    selected_key = str(int(round(total_distance_km)))
+
     ghost_runners = generate_competitors_with_profiles(total_minutes, avg_speed)
+
+    for label, source in [("PB", pb_times), ("Goal", goal_times)]:
+        minutes = source.get(selected_key)
+        if minutes:
+            speed = total_distance_km / (minutes / 60)
+            ghost_runners.append({
+                "base_name": f"{label} {selected_key}km",
+                "speed_profile": [(0, speed)]
+            })
+    print(f"[DEBUG] Selected key: {selected_key}")
+    print(f"[DEBUG] PB time: {pb_times.get(selected_key)} min")
+    print(f"[DEBUG] Goal time: {goal_times.get(selected_key)} min")
+    print(f"[DEBUG] Ghost runners: {[g['base_name'] for g in ghost_runners]}")
+
     start_tcx_file(start_time)
 
     loop = asyncio.get_event_loop()
@@ -565,14 +613,19 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         if speed is None: speed = 0.0
         if distance is None: distance = 0.0
         if elapsed_time is None: elapsed_time = 0.0
-
         shared_state["elapsed_time"] = elapsed_time
         shared_state["distance"] = distance
 
-        loop.call_soon_threadsafe(speed_ratio_queue.put_nowait, speed / initial_speed if initial_speed > 0 else 1.0)
-        loop.call_soon_threadsafe(speed_queue.put_nowait, speed)
-        loop.call_soon_threadsafe(distance_queue.put_nowait, distance)
-        loop.call_soon_threadsafe(elapsed_time_queue.put_nowait, elapsed_time)
+        def safe_put(q, val):
+            try: q.get_nowait()
+            except asyncio.QueueEmpty: pass
+            try: q.put_nowait(val)
+            except asyncio.QueueFull: pass
+
+        loop.call_soon_threadsafe(safe_put, speed_ratio_queue, speed / initial_speed if initial_speed > 0 else 1.0)
+        loop.call_soon_threadsafe(safe_put, speed_queue, speed)
+        loop.call_soon_threadsafe(safe_put, distance_queue, distance)
+        loop.call_soon_threadsafe(safe_put, elapsed_time_queue, elapsed_time)
 
         timestamp = datetime.utcnow()
         append_tcx_trackpoint(timestamp, speed, distance, incline)
@@ -587,8 +640,10 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             ghost_gaps = {}
             for ghost in ghost_runners:
                 ghost_distance_m = simulate_ghost_distance(ghost["speed_profile"], elapsed)
+                current_speed = get_current_ghost_speed(ghost["speed_profile"], elapsed)
+                ghost_name = f"{ghost['base_name']} ({current_speed:.1f} km/h)"
                 gap = user_distance_m - ghost_distance_m
-                ghost_gaps[ghost["name"]] = gap
+                ghost_gaps[ghost_name] = gap
             loop.call_soon_threadsafe(ghost_gap_queue.put_nowait, ghost_gaps)
 
     print("[INFO] Starting treadmill monitoring...")
@@ -612,11 +667,9 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             while True:
                 await asyncio.sleep(0.2)
                 current = shared_state["elapsed_time"] if routine_type == "time" else shared_state["distance"]
-
                 if not exit_signal.empty():
                     print("[INFO] User exit detected.")
                     raise asyncio.CancelledError("User requested exit")
-
                 if current >= target:
                     print("[SEGMENT] Segment complete.")
                     break
@@ -625,13 +678,9 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         print("[INFO] Workout interrupted by user.")
     finally:
         print("[INFO] Cleaning up...")
-
         await video_task
-
         end_time = datetime.utcnow()
         final_distance = last_distance
-        finalize_tcx_file()
-        # Derive GPX path from video filename
         finalize_tcx_file()
 
         video_basename = os.path.splitext(os.path.basename(video_path))[0]
@@ -665,12 +714,10 @@ class GhostRunnerHUD:
     def __init__(self, sprite_path='Animations/Runners.png', target_width=50, animation_speed=5):
         self.sprite_path = sprite_path
         self.target_width = target_width
-        self.animation_speed = animation_speed  # frames to wait before advancing animation frame
-
+        self.animation_speed = animation_speed
         self.frames = []
         self.frame_idx = 0
         self.frame_counter = 0
-
         self._load_and_process_sprites()
 
     def _convert_black_on_white_to_white_on_transparent(self, frame):
@@ -705,7 +752,6 @@ class GhostRunnerHUD:
         h, w = sprite.shape[:2]
         if y < 0 or y + h > background.shape[0] or x < 0 or x + w > background.shape[1]:
             return
-
         if sprite.shape[2] == 4:
             alpha_s = sprite[:, :, 3] / 255.0
             alpha_s = alpha_s[..., None]
@@ -720,67 +766,73 @@ class GhostRunnerHUD:
         img = cv2.imread(self.sprite_path, cv2.IMREAD_UNCHANGED)
         if img is None:
             raise FileNotFoundError(f"Could not load sprite image '{self.sprite_path}'")
-
         h, w = img.shape[:2]
         half_h, half_w = h // 2, w // 2
-
         center_crop_width = 205
         crop_x_start = half_w // 2 - center_crop_width // 2
         crop_x_end = crop_x_start + center_crop_width
-
         quadrants = [
             img[0:half_h, crop_x_start:crop_x_end],
             img[0:half_h, half_w + crop_x_start:half_w + crop_x_end],
             img[half_h:h, crop_x_start:crop_x_end],
             img[half_h:h, half_w + crop_x_start:half_w + crop_x_end]
         ]
-
         processed = []
         for f in quadrants:
             rgba = self._convert_black_on_white_to_white_on_transparent(f)
             resized = self._resize_sprite(rgba)
             processed.append(resized)
-
         self.frames = processed
 
     def draw_ghost_runners(self, frame, ghost_gaps):
-        #print("Received ghost_gaps:")
         if not isinstance(ghost_gaps, dict):
-            print("  ghost_gaps is not a dictionary or is None")
+            print("ghost_gaps is not a dictionary or is None")
             return
 
-        selected_ghosts = sorted(ghost_gaps.items(), reverse=True)[:3]
+        # Split into left and right runners
+        left_runners = []
+        right_runners = []
+        for name, gap in ghost_gaps.items():
+            if name.startswith("PB") or name.startswith("Goal"):
+                left_runners.append((name, gap))
+            else:
+                right_runners.append((name, gap))
 
-        # Update animation frame counter
+        # Update animation frame
         self.frame_counter += 1
         if self.frame_counter % self.animation_speed == 0:
             self.frame_idx = (self.frame_idx + 1) % len(self.frames)
 
         base_sprite = self.frames[self.frame_idx]
         sprite_h, sprite_w = base_sprite.shape[:2]
+        screen_h, screen_w = frame.shape[:2]
 
-        num_ghost_lines = len(selected_ghosts)
-        top_ghost_text_y = frame.shape[0] - 30 - (num_ghost_lines - 1) * 25
-        base_y = top_ghost_text_y - sprite_h - 10
-        start_x = frame.shape[1] - (sprite_w * 3) - (5 * 2) - 20
+        def draw_group(runners, side):
+            max_runners = 3
+            selected = sorted(runners, reverse=True)[:max_runners]
+            base_y = screen_h - 30 - (len(selected) - 1) * 25 - sprite_h - 10
+            if side == "right":
+                start_x = screen_w - (sprite_w * max_runners) - (5 * (max_runners - 1)) - 20
+            else:
+                start_x = 20
 
-        for i, (name, gap) in enumerate(selected_ghosts):
-            try:
-                gap = float(gap)
-                if gap > 50 or gap < -400:
-                    continue  # skip ghosts too far behind or ahead
+            for i, (name, gap) in enumerate(selected):
+                try:
+                    gap = float(gap)
+                    if gap > 50 or gap < -400:
+                        continue
+                    ratio = max(0.0, min(1.0, 1 + (gap / 400.0)))
+                    width = max(5, int(self.target_width * ratio))
+                    sprite = self._resize_sprite(base_sprite, target_width=width)
+                    if gap > 0:
+                        sprite = self._tint_sprite_red(sprite)
+                    x = start_x + i * (sprite.shape[1] + 5)
+                    self._overlay_sprite(frame, sprite, x, base_y)
+                except Exception as e:
+                    print(f"Error processing ghost '{name}': {e}")
 
-                ratio = max(0.0, min(1.0, 1 + (gap / 400.0)))
-                width = max(5, int(self.target_width * ratio))
-                sprite = self._resize_sprite(base_sprite, target_width=width)
-
-                if gap > 0:
-                    sprite = self._tint_sprite_red(sprite)
-
-                x = start_x + i * (sprite.shape[1] + 5)
-                self._overlay_sprite(frame, sprite, x, base_y)
-            except Exception as e:
-                print(f"Error processing ghost '{name}': {e}")
+        draw_group(left_runners, "left")
+        draw_group(right_runners, "right")
 --- End of ghost_runner_hud.py ---
 
 [File] list_directory.py
@@ -2639,6 +2691,7 @@ def parse_treadmill_data(data: bytes):
 
 [File] user_config.json
 --- Start of user_config.json ---
+
 {
   "pb_times_minutes": {
     "1": 5.0,
@@ -2646,6 +2699,13 @@ def parse_treadmill_data(data: bytes):
     "5": 32.33,
     "10": 115.0,
     "21": 140.0
+  },
+  "goal_times_minutes": {
+    "1": 5.0,
+    "3": 18.0,
+    "5": 30.0,
+    "10": 60.0,
+    "21": 135.0
   }
 }
 --- End of user_config.json ---
@@ -2849,6 +2909,7 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
         variation = random.uniform(-0.025, 0.025)  # ±2.5% duration variation
         comp_time = user_duration_min * (1 + variation)
         comp_avg_speed = user_avg_speed * (user_duration_min / comp_time)  # Maintain same distance
+        print(f"A ghost time is: {comp_time:.2f} min, with expected average speed of: {comp_avg_speed:.2f} km\n")
         strategy = random.choice(strategies)
         competitors.append({
             "name": f"Ghost {chr(65+i)}",
@@ -2858,9 +2919,10 @@ def generate_competitor_profiles(user_duration_min, user_avg_speed, num_competit
         })
     return competitors
 
-def normalize_speed_profile(speed_profile, target_avg):
-    total = sum(speed for _, speed in speed_profile)
-    scale = target_avg * len(speed_profile) / total
+def normalize_speed_profile(speed_profile, target_avg, segment_duration_sec):
+    total_distance = compute_total_distance(speed_profile, segment_duration_sec)
+    expected_distance = target_avg * (segment_duration_sec * len(speed_profile) / 3600.0)
+    scale = expected_distance / total_distance
     return [(t, speed * scale) for t, speed in speed_profile]
 
 def generate_speed_profile(duration_min, avg_speed, strategy):
@@ -2888,7 +2950,7 @@ def generate_speed_profile(duration_min, avg_speed, strategy):
             speed = random.uniform(avg_speed * 0.8, avg_speed * 1.2)
             speed_profile.append((i * segment_duration, speed))
 
-    return normalize_speed_profile(speed_profile, avg_speed)
+    return normalize_speed_profile(speed_profile, avg_speed, segment_duration)
 
 def compute_total_distance(speed_profile, segment_duration_sec):
     total = 0.0
@@ -2902,8 +2964,21 @@ def generate_competitors_with_profiles(user_duration_min, user_avg_speed, num_co
         duration_min = competitor["duration_min"]
         strategy = competitor["strategy"]
         avg_speed = competitor["avg_speed"]
+
         speed_profile = generate_speed_profile(duration_min, avg_speed, strategy)
         competitor["speed_profile"] = speed_profile
+
+        # ➕ Add time difference to name
+        time_diff_sec = (duration_min - user_duration_min) * 60
+        if abs(time_diff_sec) < 1:
+            delta_str = "±0s"
+        elif time_diff_sec > 0:
+            delta_str = f"+{int(round(time_diff_sec))}s"
+        else:
+            delta_str = f"{int(round(time_diff_sec))}s"
+
+        competitor["base_name"] = competitor["name"]
+
     return competitors
 
 if __name__ == "__main__":
