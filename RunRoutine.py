@@ -87,8 +87,21 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     avg_speed = total_distance_km / (total_minutes / 60)
 
     user_config = load_user_config()
+    use_video_filename_speed = user_config.get("use_video_filename_speed", False)
+
+    # Extract speed from video filename
+    video_basename = os.path.basename(video_path)
+    try:
+        parts = os.path.splitext(video_basename)[0].split("_")
+        video_speed = float(parts[1])
+    except Exception:
+        video_speed = initial_speed
+
+    baseline_speed = video_speed if use_video_filename_speed else initial_speed
+
     pb_times = user_config.get("pb_times_minutes", {})
     goal_times = user_config.get("goal_times_minutes", {})
+
     pb_keys = set(map(int, pb_times.keys()))
     goal_keys = set(map(int, goal_times.keys()))
     available_keys = sorted(pb_keys | goal_keys)
@@ -139,7 +152,7 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             try: q.put_nowait(val)
             except asyncio.QueueFull: pass
 
-        loop.call_soon_threadsafe(safe_put, speed_ratio_queue, speed / initial_speed if initial_speed > 0 else 1.0)
+        loop.call_soon_threadsafe(safe_put, speed_ratio_queue, speed / baseline_speed if baseline_speed > 0 else 1.0)
         loop.call_soon_threadsafe(safe_put, speed_queue, speed)
         loop.call_soon_threadsafe(safe_put, distance_queue, distance)
         loop.call_soon_threadsafe(safe_put, elapsed_time_queue, elapsed_time)
