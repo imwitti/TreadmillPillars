@@ -76,6 +76,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 5b/
         [Folder] 5c/
         [Folder] 5d/
+        [Folder] 5e/
         [Folder] 5f/
         [Folder] 61/
         [Folder] 62/
@@ -141,6 +142,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] b7/
         [Folder] b9/
         [Folder] ba/
+        [Folder] bb/
         [Folder] bc/
         [Folder] bd/
         [Folder] bf/
@@ -158,6 +160,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] cc/
         [Folder] ce/
         [Folder] d1/
+        [Folder] d3/
         [Folder] d6/
         [Folder] d7/
         [Folder] d8/
@@ -486,13 +489,18 @@ if __name__ == "__main__":
 --- Start of RunRoutine.py ---
 import asyncio
 import os
+import json
+from datetime import datetime
 from treadmill_control import TreadmillControl, parse_treadmill_data
 from video_playback import play_video
-from tcx_incremental import start_tcx_file, append_tcx_trackpoint, finalize_tcx_file
 from virtual_competitors import generate_competitors_with_profiles
-from datetime import datetime
-from tcx_postprocess import post_process_tcx_with_gpx
-
+from tcx_incremental import (
+    start_tcx_file,
+    start_new_lap,
+    append_tcx_trackpoint,
+    finalize_lap,
+    finalize_tcx_file
+)
 
 def simulate_ghost_distance(speed_profile, elapsed_seconds):
     distance = 0.0
@@ -514,26 +522,15 @@ def get_current_ghost_speed(speed_profile, elapsed_seconds):
         if t0 <= elapsed_seconds < t1:
             ratio = (elapsed_seconds - t0) / (t1 - t0)
             return s0 + ratio * (s1 - s0)
-    return speed_profile[-1][1]  # fallback to last speed
+    return speed_profile[-1][1]
 
 async def exercise_routine(initial_speed, routine_type, routine, video_path):
-    import json
-
     def load_user_config(config_path='user_config.json'):
         try:
             with open(config_path, 'r') as f:
                 return json.load(f)
         except Exception:
             return {}
-
-    def get_current_ghost_speed(speed_profile, elapsed_seconds):
-        for i in range(len(speed_profile) - 1):
-            t0, s0 = speed_profile[i]
-            t1, s1 = speed_profile[i + 1]
-            if t0 <= elapsed_seconds < t1:
-                ratio = (elapsed_seconds - t0) / (t1 - t0)
-                return s0 + ratio * (s1 - s0)
-        return speed_profile[-1][1]
 
     shared_state = {"elapsed_time": 0.0, "distance": 0.0}
     treadmill = TreadmillControl()
@@ -578,22 +575,31 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     total_distance_km = sum(inc * duration / 60 for duration, inc in routine)
     avg_speed = total_distance_km / (total_minutes / 60)
 
-    # Load user config and generate ghost runners
     user_config = load_user_config()
     pb_times = user_config.get("pb_times_minutes", {})
     goal_times = user_config.get("goal_times_minutes", {})
-    selected_key = str(int(round(total_distance_km)))
+    pb_keys = set(map(int, pb_times.keys()))
+    goal_keys = set(map(int, goal_times.keys()))
+    available_keys = sorted(pb_keys | goal_keys)
+
+    selected_key = None
+    for key in reversed(available_keys):
+        if total_distance_km >= key:
+            selected_key = str(key)
+            break
 
     ghost_runners = generate_competitors_with_profiles(total_minutes, avg_speed)
 
     for label, source in [("PB", pb_times), ("Goal", goal_times)]:
         minutes = source.get(selected_key)
         if minutes:
-            speed = total_distance_km / (minutes / 60)
+            distance_km = int(selected_key)
+            speed = distance_km / (minutes / 60)
             ghost_runners.append({
                 "base_name": f"{label} {selected_key}km",
                 "speed_profile": [(0, speed)]
             })
+
     print(f"[DEBUG] Selected key: {selected_key}")
     print(f"[DEBUG] PB time: {pb_times.get(selected_key)} min")
     print(f"[DEBUG] Goal time: {goal_times.get(selected_key)} min")
@@ -655,6 +661,10 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             print(f"[SEGMENT {idx}] Setting speed to {speed_increment:.2f} km/h for {duration:.1f} {'min' if routine_type == 'time' else 'km'}")
             await treadmill.set_speed(speed_increment)
 
+            lap_start_time = datetime.utcnow()
+            lap_start_distance = shared_state["distance"]
+            start_new_lap(lap_start_time, lap_start_distance)
+
             if routine_type == "time":
                 segment_start = shared_state["elapsed_time"]
                 target = segment_start + duration * 60
@@ -674,6 +684,10 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
                     print("[SEGMENT] Segment complete.")
                     break
 
+            lap_end_time = datetime.utcnow()
+            lap_end_distance = shared_state["distance"]
+            finalize_lap(lap_end_time, lap_end_distance)
+
     except asyncio.CancelledError:
         print("[INFO] Workout interrupted by user.")
     finally:
@@ -683,15 +697,6 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         final_distance = last_distance
         finalize_tcx_file()
 
-        video_basename = os.path.splitext(os.path.basename(video_path))[0]
-        video_dir = os.path.dirname(video_path)
-        gpx_file = os.path.join(video_dir, f"{video_basename}.gpx")
-
-        if os.path.exists(gpx_file):
-            print(f"[INFO] Found GPX route at {gpx_file}, post-processing TCX...")
-            post_process_tcx_with_gpx(tcx_filename, gpx_file)
-        else:
-            print(f"[WARN] No GPX route found at {gpx_file}, skipping post-processing.")
         print("[INFO] Workout complete.")
         return {
             "start_time": start_time,
@@ -810,11 +815,13 @@ class GhostRunnerHUD:
         def draw_group(runners, side):
             max_runners = 3
             selected = sorted(runners, reverse=True)[:max_runners]
-            base_y = screen_h - 30 - (len(selected) - 1) * 25 - sprite_h - 10
+            
             if side == "right":
                 start_x = screen_w - (sprite_w * max_runners) - (5 * (max_runners - 1)) - 20
+                base_y = screen_h - 30 - (len(selected) - 1) * 25 - sprite_h - 10
             else:
                 start_x = 20
+                base_y = screen_h - 60 - (len(selected) - 1) * 25 - sprite_h - 10
 
             for i, (name, gap) in enumerate(selected):
                 try:
@@ -828,8 +835,11 @@ class GhostRunnerHUD:
                         sprite = self._tint_sprite_red(sprite)
                     x = start_x + i * (sprite.shape[1] + 5)
                     self._overlay_sprite(frame, sprite, x, base_y)
+
+
                 except Exception as e:
                     print(f"Error processing ghost '{name}': {e}")
+
 
         draw_group(left_runners, "left")
         draw_group(right_runners, "right")
@@ -1608,35 +1618,89 @@ def show_post_workout_stats():
 --- Start of tcx_incremental.py ---
 import os
 from datetime import datetime
+from typing import Optional
 
-# TCX and TPX namespaces
+from xml.sax.saxutils import escape
+
 NS_TCX = "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
 NS_TPX = "http://www.garmin.com/xmlschemas/ActivityExtension/v2"
 
 tcx_filename = None
 track_file = None
-start_iso = None
-lap_data = {
-    'start_time': None,
-    'last_time': None,
-    'total_distance_km': 0.0
-}
+lap_start_time = None
+lap_start_distance = 0.0
+lap_index = 0
+gps_track = []  # List of (distance_m, lat, lon)
 
-def start_tcx_file(start_time: datetime):
-    global tcx_filename, track_file, start_iso, lap_data
+def load_gpx_track(gpx_path):
+    import xml.etree.ElementTree as ET
+    tree = ET.parse(gpx_path)
+    root = tree.getroot()
+    ns = {'default': 'http://www.topografix.com/GPX/1/1'}
+    trkpts = root.findall(".//default:trkpt", ns)
+
+    track = []
+    last_lat = last_lon = None
+    total_distance = 0.0
+
+    def haversine(lat1, lon1, lat2, lon2):
+        from math import radians, sin, cos, sqrt, atan2
+        R = 6371000  # Earth radius in meters
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+        return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    for pt in trkpts:
+        lat = float(pt.attrib['lat'])
+        lon = float(pt.attrib['lon'])
+        if last_lat is not None:
+            total_distance += haversine(last_lat, last_lon, lat, lon)
+        track.append((total_distance, lat, lon))
+        last_lat, last_lon = lat, lon
+
+    return track
+
+def interpolate_gps(distance_m):
+    if not gps_track or distance_m < gps_track[0][0] or distance_m > gps_track[-1][0]:
+        return None, None
+    for i in range(len(gps_track) - 1):
+        d0, lat0, lon0 = gps_track[i]
+        d1, lat1, lon1 = gps_track[i + 1]
+        if d0 <= distance_m <= d1:
+            ratio = (distance_m - d0) / (d1 - d0)
+            lat = lat0 + ratio * (lat1 - lat0)
+            lon = lon0 + ratio * (lon1 - lon0)
+            return lat, lon
+    return gps_track[-1][1], gps_track[-1][2]
+
+def start_tcx_file(start_time: datetime, gpx_path: Optional[str] = None):
+    global tcx_filename, track_file, lap_index, gps_track
 
     os.makedirs("TCX", exist_ok=True)
     tcx_filename = f"TCX/workout_{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.tcx"
-    start_iso = start_time.isoformat()
-    lap_data['start_time'] = start_time
+    lap_index = 0
+
+    if gpx_path and os.path.exists(gpx_path):
+        gps_track = load_gpx_track(gpx_path)
 
     with open(tcx_filename, 'w', encoding='utf-8') as f:
         f.write(f'''<?xml version="1.0" encoding="UTF-8"?>
 <TrainingCenterDatabase xmlns="{NS_TCX}" xmlns:ns3="{NS_TPX}">
   <Activities>
-    <Activity Sport="Running">
-      <Id>{start_iso}</Id>
-      <Lap StartTime="{start_iso}">
+    <Activity Sport="VirtualRun">
+      <Id>{start_time.isoformat()}</Id>
+''')
+
+    track_file = open(tcx_filename, 'a', encoding='utf-8')
+
+def start_new_lap(start_time: datetime, start_distance_km: float):
+    global track_file, lap_start_time, lap_start_distance, lap_index
+    lap_start_time = start_time
+    lap_start_distance = start_distance_km
+    lap_index += 1
+
+    track_file.write(f'''      <Lap StartTime="{start_time.isoformat()}">
         <TotalTimeSeconds>0</TotalTimeSeconds>
         <DistanceMeters>0</DistanceMeters>
         <Calories>0</Calories>
@@ -1645,40 +1709,49 @@ def start_tcx_file(start_time: datetime):
         <Track>
 ''')
 
-    track_file = open(tcx_filename, 'a', encoding='utf-8')
-
 def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: float, incline_percent: float):
-    global track_file, lap_data
+    global track_file
 
     time_iso = timestamp.isoformat()
     speed_mps = speed_kmh / 3.6
     dist_m = distance_km * 1000
+    lat, lon = interpolate_gps(dist_m)
 
-    # Update lap stats
-    lap_data['last_time'] = timestamp
-    lap_data['total_distance_km'] = max(lap_data['total_distance_km'], distance_km)
+    track_file.write(f'''          <Trackpoint>
+            <Time>{time_iso}</Time>
+''')
+    if lat is not None and lon is not None:
+        track_file.write(f'''            <Position>
+              <LatitudeDegrees>{lat:.6f}</LatitudeDegrees>
+              <LongitudeDegrees>{lon:.6f}</LongitudeDegrees>
+            </Position>
+''')
+    track_file.write(f'''            <DistanceMeters>{dist_m:.2f}</DistanceMeters>
+            <Extensions>
+              <ns3:TPX>
+                <ns3:Speed>{speed_mps:.3f}</ns3:Speed>
+                <ns3:Incline>{incline_percent:.2f}</ns3:Incline>
+              </ns3:TPX>
+            </Extensions>
+          </Trackpoint>
+''')
 
-    track_file.write(f'''    <Trackpoint>
-      <Time>{time_iso}</Time>
-      <DistanceMeters>{dist_m:.2f}</DistanceMeters>
-      <Extensions>
-        <ns3:TPX>
-          <ns3:Speed>{speed_mps:.3f}</ns3:Speed>
-          <ns3:Incline>{incline_percent:.2f}</ns3:Incline>
-        </ns3:TPX>
-      </Extensions>
-    </Trackpoint>
+def finalize_lap(end_time: datetime, end_distance_km: float):
+    global track_file, lap_start_time, lap_start_distance
+
+    total_time = (end_time - lap_start_time).total_seconds()
+    total_distance_m = (end_distance_km - lap_start_distance) * 1000
+
+    track_file.write(f'''        </Track>
+        <TotalTimeSeconds>{total_time:.1f}</TotalTimeSeconds>
+        <DistanceMeters>{total_distance_m:.1f}</DistanceMeters>
+      </Lap>
 ''')
 
 def finalize_tcx_file():
-    global tcx_filename, track_file, lap_data
+    global track_file
 
-    # Finish the <Track> and patch lap summary
-    track_file.write(f'''    </Track>
-        <TotalTimeSeconds>{(lap_data['last_time'] - lap_data['start_time']).total_seconds():.1f}</TotalTimeSeconds>
-        <DistanceMeters>{lap_data['total_distance_km'] * 1000:.1f}</DistanceMeters>
-      </Lap>
-    </Activity>
+    track_file.write(f'''    </Activity>
   </Activities>
 </TrainingCenterDatabase>
 ''')
@@ -2791,17 +2864,40 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         cv2.putText(frame, hud_time_text, (10, frame.shape[0] - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # HUD: Ghost Gaps
+        # HUD: Ghost Gaps (split left/right)
         if last_ghost_gaps:
-            y_offset = frame.shape[0] - 30
-            for name, gap in sorted(last_ghost_gaps.items(), reverse=True):
+            left_labels = []
+            right_labels = []
+
+            for name, gap in last_ghost_gaps.items():
+                if name.startswith("PB") or name.startswith("Goal"):
+                    left_labels.append((name, gap))
+                else:
+                    right_labels.append((name, gap))
+
+            
+            # Draw left-aligned labels (above time label)
+            y_offset_left = frame.shape[0] - 60  # 30 for time label + 30 buffer
+            for name, gap in sorted(left_labels, key=lambda x: x[1], reverse=True):
+                gap_text = f"{name}: {'+' if gap >= 0 else ''}{gap:.1f} m"
+                cv2.putText(frame, gap_text, (10, y_offset_left),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                y_offset_left -= 25
+
+
+
+            # Draw right-aligned labels
+            y_offset_right = frame.shape[0] - 30
+            for name, gap in sorted(right_labels, key=lambda x: x[1], reverse=True):
                 gap_text = f"{name}: {'+' if gap >= 0 else ''}{gap:.1f} m"
                 (text_width, _), _ = cv2.getTextSize(gap_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
                 x_position = frame.shape[1] - text_width - 10
-                cv2.putText(frame, gap_text, (x_position, y_offset),
+                cv2.putText(frame, gap_text, (x_position, y_offset_right),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-                y_offset -= 25
+                y_offset_right -= 25
+
             ghost_runner_hud.draw_ghost_runners(frame, last_ghost_gaps)
+
 
         # Exit Confirmation Overlay
         if confirm_exit:
