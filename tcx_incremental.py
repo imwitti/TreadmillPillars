@@ -29,7 +29,7 @@ def load_gpx_track(gpx_path):
         from math import radians, sin, cos, sqrt, atan2
         R = 6371000  # Earth radius in meters
         dlat = radians(lat2 - lat1)
-        dlon = radians(lon2 - lon1)
+        dlon = radians(lat2 - lon1)
         a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
         return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
@@ -91,7 +91,7 @@ def start_new_lap(start_time: datetime, start_distance_km: float):
         <Track>
 ''')
 
-def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: float, incline_percent: float):
+def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: float, incline_percent: float, heart_rate_bpm: Optional[int] = None):
     global track_file
 
     time_iso = timestamp.isoformat()
@@ -107,6 +107,9 @@ def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: fl
               <LatitudeDegrees>{lat:.6f}</LatitudeDegrees>
               <LongitudeDegrees>{lon:.6f}</LongitudeDegrees>
             </Position>
+''')
+    if heart_rate_bpm is not None:
+        track_file.write(f'''            <HeartRateBpm><Value>{heart_rate_bpm}</Value></HeartRateBpm>
 ''')
     track_file.write(f'''            <DistanceMeters>{dist_m:.2f}</DistanceMeters>
             <Extensions>

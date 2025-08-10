@@ -16,7 +16,8 @@ def get_screen_resolution():
         print("Could not determine screen resolution:", e)
         return 1280, 720
 
-async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal):
+async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, heart_rate_queue, exit_signal):
+
     cap = cv2.VideoCapture(video_path)
     last_known_speed = 0.0
     last_known_distance = 0.0
@@ -44,6 +45,11 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
             pass
 
         try:
+            last_known_hr = heart_rate_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            last_known_hr = None
+
+        try:
             last_known_speed = speed_queue.get_nowait()
         except asyncio.QueueEmpty:
             pass
@@ -61,6 +67,16 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         # HUD: Speed
         hud_speed_text = f"{last_known_speed:.1f} km/h"
         cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # HUD: Heart Rate
+        if last_known_hr is not None:
+            hr_text = f"HR: {last_known_hr} bpm"
+            (text_width, text_height), _ = cv2.getTextSize(hr_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+            x_position = (frame.shape[1] - text_width) // 2
+            y_position = 30  # Top margin
+            cv2.putText(frame, hr_text, (x_position, y_position), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 2)
+
+
 
         # HUD: Distance
         hud_distance_text = f"{last_known_distance:.2f} km"

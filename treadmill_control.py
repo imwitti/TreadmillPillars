@@ -1,14 +1,14 @@
-# treadmill_control.py
-
 import asyncio
 import platform
-import time
 from bleak import BleakScanner, BleakClient
 from log_simulator import simulate_from_log  # only used when testing
 
 ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
 control_point_uuid = "00002AD9-0000-1000-8000-00805f9b34fb"
 treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
+
+heart_rate_service_uuid = "0000180D-0000-1000-8000-00805f9b34fb"
+heart_rate_measurement_uuid = "00002A37-0000-1000-8000-00805f9b34fb"
 
 class TreadmillControl:
     def __init__(self, testing=None, log_path="treadmill_log.json"):
@@ -17,6 +17,8 @@ class TreadmillControl:
         self.log_path = log_path
         self.current_speed = 0.0
         self.start_time = None
+        self.hr_client = None
+        self.latest_hr = None
 
     async def connect(self, target_name=None, target_address=None):
         if self.testing:
@@ -50,14 +52,38 @@ class TreadmillControl:
                     self.client = BleakClient(treadmill.address)
                     await self.client.connect()
                     print(f"Connected to {treadmill.name or 'Unknown'} ({treadmill.address})")
-                    return
-
-                raise Exception("Treadmill not found.")
+                    break
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {e}")
                 await asyncio.sleep(2)
+        else:
+            raise Exception("Failed to connect after 6 attempts.")
 
-        raise Exception("Failed to connect after 6 attempts.")
+        asyncio.create_task(self.try_connect_hr_monitor())
+
+    async def try_connect_hr_monitor(self):
+        for attempt in range(3):
+            try:
+                print(f"[HR] Attempting to connect to heart rate monitor (try {attempt + 1})...")
+                devices = await BleakScanner.discover()
+                for d in devices:
+                    if heart_rate_service_uuid.lower() in [uuid.lower() for uuid in d.metadata.get("uuids", [])]:
+                        self.hr_client = BleakClient(d.address)
+                        await self.hr_client.connect()
+                        print(f"[HR] Connected to {d.name} ({d.address})")
+
+                        def handle_hr_notification(_, data: bytearray):
+                            if len(data) > 1:
+                                self.latest_hr = data[1]
+                                print(f"[HR] Heart Rate: {self.latest_hr} bpm")
+
+                        await self.hr_client.start_notify(heart_rate_measurement_uuid, handle_hr_notification)
+                        return
+                print("[HR] No heart rate monitor found.")
+            except Exception as e:
+                print(f"[HR] Connection attempt {attempt + 1} failed: {e}")
+            await asyncio.sleep(2)
+        print("[HR] Giving up on heart rate monitor connection.")
 
     async def disconnect(self):
         if self.testing:
@@ -66,6 +92,8 @@ class TreadmillControl:
             return
         if self.client:
             await self.client.disconnect()
+        if self.hr_client:
+            await self.hr_client.disconnect()
 
     async def request_control(self):
         if self.testing:
@@ -136,13 +164,13 @@ class TreadmillControl:
         await self.set_speed(self.current_speed - 0.5)
 
     async def start_or_resume(self):
-            if self.testing:
-                print("Simulated FTMS start/resume command.")
-                return
-            await self.client.write_gatt_char(control_point_uuid, bytearray([0x07]))
-            await self.wait_for_response()
+        if self.testing:
+            print("Simulated FTMS start/resume command.")
+            return
+        await self.client.write_gatt_char(control_point_uuid, bytearray([0x07]))
+        await self.wait_for_response()
 
-def parse_treadmill_data(data: bytes):
+def parse_treadmill_data(data: bytes, hr_value=None):
     flags = int.from_bytes(data[0:2], byteorder='little')
     idx = 2
 
@@ -216,17 +244,12 @@ def parse_treadmill_data(data: bytes):
         parsed["force_on_belt_n"] = read_sint16()
         parsed["power_output_w"] = read_sint16()
 
-    #return parsed
-
     values = (
         parsed.get("speed_kmh"),
         parsed.get("distance_km"),
         parsed.get("incline_percent"),
-        parsed.get("elapsed_time_s")
+        parsed.get("elapsed_time_s"),
+        parsed.get("heart_rate_bpm") if parsed.get("heart_rate_bpm") is not None else hr_value
     )
 
-    #print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
-
     return values
-
-    

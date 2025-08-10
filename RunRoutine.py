@@ -55,6 +55,7 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     distance_queue = asyncio.Queue(maxsize=1)
     await distance_queue.put(0.0)
     elapsed_time_queue = asyncio.Queue(maxsize=1)
+    heart_rate_queue = asyncio.Queue(maxsize=1)
     ghost_gap_queue = asyncio.Queue(maxsize=1)
     exit_signal = asyncio.Queue(maxsize=1)
 
@@ -67,9 +68,11 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             distance_queue,
             elapsed_time_queue,
             ghost_gap_queue,
+            heart_rate_queue,  # ✅ Add this
             exit_signal
         )
     )
+
 
     await asyncio.sleep(2.0)
     print("[INFO] Sending FTMS 'Start or Resume' command...")
@@ -138,7 +141,7 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     def callback(sender, data):
         nonlocal last_logged_distance, last_distance
 
-        speed, distance, incline, elapsed_time = parse_treadmill_data(data)
+        speed, distance, incline, elapsed_time, heart_rate = parse_treadmill_data(data, hr_value=treadmill.latest_hr)
         if incline is None: incline = 0.0
         if speed is None: speed = 0.0
         if distance is None: distance = 0.0
@@ -156,9 +159,11 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
         loop.call_soon_threadsafe(safe_put, speed_queue, speed)
         loop.call_soon_threadsafe(safe_put, distance_queue, distance)
         loop.call_soon_threadsafe(safe_put, elapsed_time_queue, elapsed_time)
+        loop.call_soon_threadsafe(safe_put, heart_rate_queue, heart_rate)
+
 
         timestamp = datetime.utcnow()
-        append_tcx_trackpoint(timestamp, speed, distance, incline)
+        append_tcx_trackpoint(timestamp, speed, distance, incline, heart_rate)
         last_distance = distance
 
         elapsed = (timestamp - start_time).total_seconds()
