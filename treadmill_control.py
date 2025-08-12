@@ -73,6 +73,7 @@ class TreadmillControl:
                         print(f"[HR] Connected to {d.name} ({d.address})")
 
                         def handle_hr_notification(_, data: bytearray):
+                            print(f"[HR] Raw bytes: {list(data)}")  # 👈 DEBUG LINE
                             if len(data) > 1:
                                 self.latest_hr = data[1]
                                 print(f"[HR] Heart Rate: {self.latest_hr} bpm")

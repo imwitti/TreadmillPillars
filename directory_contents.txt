@@ -31,6 +31,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 19/
         [Folder] 1b/
         [Folder] 1d/
+        [Folder] 1e/
         [Folder] 20/
         [Folder] 21/
         [Folder] 22/
@@ -44,9 +45,11 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 2d/
         [Folder] 2e/
         [Folder] 2f/
+        [Folder] 30/
         [Folder] 31/
         [Folder] 33/
         [Folder] 34/
+        [Folder] 35/
         [Folder] 36/
         [Folder] 37/
         [Folder] 3a/
@@ -73,6 +76,7 @@ Directory structure and file contents of: C:\Users\mzh\OneDrive - Danaher\Docume
         [Folder] 56/
         [Folder] 58/
         [Folder] 59/
+        [Folder] 5a/
         [Folder] 5b/
         [Folder] 5c/
         [Folder] 5d/
@@ -547,6 +551,7 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     distance_queue = asyncio.Queue(maxsize=1)
     await distance_queue.put(0.0)
     elapsed_time_queue = asyncio.Queue(maxsize=1)
+    heart_rate_queue = asyncio.Queue(maxsize=1)
     ghost_gap_queue = asyncio.Queue(maxsize=1)
     exit_signal = asyncio.Queue(maxsize=1)
 
@@ -559,9 +564,11 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             distance_queue,
             elapsed_time_queue,
             ghost_gap_queue,
+            heart_rate_queue,  # ✅ Add this
             exit_signal
         )
     )
+
 
     await asyncio.sleep(2.0)
     print("[INFO] Sending FTMS 'Start or Resume' command...")
@@ -579,8 +586,21 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     avg_speed = total_distance_km / (total_minutes / 60)
 
     user_config = load_user_config()
+    use_video_filename_speed = user_config.get("use_video_filename_speed", False)
+
+    # Extract speed from video filename
+    video_basename = os.path.basename(video_path)
+    try:
+        parts = os.path.splitext(video_basename)[0].split("_")
+        video_speed = float(parts[1])
+    except Exception:
+        video_speed = initial_speed
+
+    baseline_speed = video_speed if use_video_filename_speed else initial_speed
+
     pb_times = user_config.get("pb_times_minutes", {})
     goal_times = user_config.get("goal_times_minutes", {})
+
     pb_keys = set(map(int, pb_times.keys()))
     goal_keys = set(map(int, goal_times.keys()))
     available_keys = sorted(pb_keys | goal_keys)
@@ -617,7 +637,7 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
     def callback(sender, data):
         nonlocal last_logged_distance, last_distance
 
-        speed, distance, incline, elapsed_time = parse_treadmill_data(data)
+        speed, distance, incline, elapsed_time, heart_rate = parse_treadmill_data(data, hr_value=treadmill.latest_hr)
         if incline is None: incline = 0.0
         if speed is None: speed = 0.0
         if distance is None: distance = 0.0
@@ -631,13 +651,15 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
             try: q.put_nowait(val)
             except asyncio.QueueFull: pass
 
-        loop.call_soon_threadsafe(safe_put, speed_ratio_queue, speed / initial_speed if initial_speed > 0 else 1.0)
+        loop.call_soon_threadsafe(safe_put, speed_ratio_queue, speed / baseline_speed if baseline_speed > 0 else 1.0)
         loop.call_soon_threadsafe(safe_put, speed_queue, speed)
         loop.call_soon_threadsafe(safe_put, distance_queue, distance)
         loop.call_soon_threadsafe(safe_put, elapsed_time_queue, elapsed_time)
+        loop.call_soon_threadsafe(safe_put, heart_rate_queue, heart_rate)
+
 
         timestamp = datetime.utcnow()
-        append_tcx_trackpoint(timestamp, speed, distance, incline)
+        append_tcx_trackpoint(timestamp, speed, distance, incline, heart_rate)
         last_distance = distance
 
         elapsed = (timestamp - start_time).total_seconds()
@@ -710,9 +732,62 @@ async def exercise_routine(initial_speed, routine_type, routine, video_path):
 
 [Folder] Simulation/
 [Folder] TCX/
+    [File] postparsetcx.py
+    --- Start of postparsetcx.py ---
+    --- End of postparsetcx.py ---
+
 [Folder] __pycache__/
 [Folder] assets/
 [Folder] fonts/
+[File] getTCX.py
+--- Start of getTCX.py ---
+import os
+from paramiko import SSHClient, AutoAddPolicy
+from scp import SCPClient
+
+# OrangePi info
+HOST = "192.168.1.118"
+USERNAME = "orangepi"
+REMOTE_DIR = "/home/orangepi/Documents/TreadmillPillars/TCX"
+
+# Local download folder
+LOCAL_DOWNLOAD_DIR = os.path.expanduser("~/Downloads")
+
+def get_latest_tcx_filename(ssh_client):
+    # Command to get the most recently modified TCX file in REMOTE_DIR
+    # It lists files sorted by modification time (newest first), filtered by .tcx extension
+    cmd = f"ls -t {REMOTE_DIR}/*.tcx 2>/dev/null | head -n 1"
+    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+    latest_file = stdout.read().decode().strip()
+    return latest_file if latest_file else None
+
+def main():
+    ssh = SSHClient()
+    ssh.set_missing_host_key_policy(AutoAddPolicy())
+    
+    print("Connecting to OrangePi...")
+    ssh.connect(HOST, username=USERNAME, password="orangepi")  # Add password= or key_filename= if needed
+    
+    latest_file = get_latest_tcx_filename(ssh)
+    if not latest_file:
+        print("No TCX files found in the remote directory.")
+        ssh.close()
+        return
+    
+    print(f"Latest TCX file found: {latest_file}")
+    
+    with SCPClient(ssh.get_transport()) as scp:
+        local_path = os.path.join(LOCAL_DOWNLOAD_DIR, os.path.basename(latest_file))
+        print(f"Downloading to {local_path} ...")
+        scp.get(latest_file, local_path)
+        print("Download completed.")
+    
+    ssh.close()
+
+if __name__ == "__main__":
+    main()
+--- End of getTCX.py ---
+
 [File] ghost_runner_hud.py
 --- Start of ghost_runner_hud.py ---
 import cv2
@@ -1650,7 +1725,7 @@ def load_gpx_track(gpx_path):
         from math import radians, sin, cos, sqrt, atan2
         R = 6371000  # Earth radius in meters
         dlat = radians(lat2 - lat1)
-        dlon = radians(lon2 - lon1)
+        dlon = radians(lat2 - lon1)
         a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
         return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
@@ -1712,7 +1787,7 @@ def start_new_lap(start_time: datetime, start_distance_km: float):
         <Track>
 ''')
 
-def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: float, incline_percent: float):
+def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: float, incline_percent: float, heart_rate_bpm: Optional[int] = None):
     global track_file
 
     time_iso = timestamp.isoformat()
@@ -1728,6 +1803,9 @@ def append_tcx_trackpoint(timestamp: datetime, speed_kmh: float, distance_km: fl
               <LatitudeDegrees>{lat:.6f}</LatitudeDegrees>
               <LongitudeDegrees>{lon:.6f}</LongitudeDegrees>
             </Position>
+''')
+    if heart_rate_bpm is not None:
+        track_file.write(f'''            <HeartRateBpm><Value>{heart_rate_bpm}</Value></HeartRateBpm>
 ''')
     track_file.write(f'''            <DistanceMeters>{dist_m:.2f}</DistanceMeters>
             <Extensions>
@@ -1875,17 +1953,17 @@ def post_process_tcx_with_gpx(tcx_file_path, gpx_file_path, output_file_path=Non
 
 [File] treadmill_control.py
 --- Start of treadmill_control.py ---
-# treadmill_control.py
-
 import asyncio
 import platform
-import time
 from bleak import BleakScanner, BleakClient
 from log_simulator import simulate_from_log  # only used when testing
 
 ftms_service_uuid = "00001826-0000-1000-8000-00805f9b34fb"
 control_point_uuid = "00002AD9-0000-1000-8000-00805f9b34fb"
 treadmill_data_uuid = "00002ACD-0000-1000-8000-00805f9b34fb"
+
+heart_rate_service_uuid = "0000180D-0000-1000-8000-00805f9b34fb"
+heart_rate_measurement_uuid = "00002A37-0000-1000-8000-00805f9b34fb"
 
 class TreadmillControl:
     def __init__(self, testing=None, log_path="treadmill_log.json"):
@@ -1894,6 +1972,8 @@ class TreadmillControl:
         self.log_path = log_path
         self.current_speed = 0.0
         self.start_time = None
+        self.hr_client = None
+        self.latest_hr = None
 
     async def connect(self, target_name=None, target_address=None):
         if self.testing:
@@ -1927,14 +2007,38 @@ class TreadmillControl:
                     self.client = BleakClient(treadmill.address)
                     await self.client.connect()
                     print(f"Connected to {treadmill.name or 'Unknown'} ({treadmill.address})")
-                    return
-
-                raise Exception("Treadmill not found.")
+                    break
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {e}")
                 await asyncio.sleep(2)
+        else:
+            raise Exception("Failed to connect after 6 attempts.")
 
-        raise Exception("Failed to connect after 6 attempts.")
+        asyncio.create_task(self.try_connect_hr_monitor())
+
+    async def try_connect_hr_monitor(self):
+        for attempt in range(3):
+            try:
+                print(f"[HR] Attempting to connect to heart rate monitor (try {attempt + 1})...")
+                devices = await BleakScanner.discover()
+                for d in devices:
+                    if heart_rate_service_uuid.lower() in [uuid.lower() for uuid in d.metadata.get("uuids", [])]:
+                        self.hr_client = BleakClient(d.address)
+                        await self.hr_client.connect()
+                        print(f"[HR] Connected to {d.name} ({d.address})")
+
+                        def handle_hr_notification(_, data: bytearray):
+                            if len(data) > 1:
+                                self.latest_hr = data[1]
+                                print(f"[HR] Heart Rate: {self.latest_hr} bpm")
+
+                        await self.hr_client.start_notify(heart_rate_measurement_uuid, handle_hr_notification)
+                        return
+                print("[HR] No heart rate monitor found.")
+            except Exception as e:
+                print(f"[HR] Connection attempt {attempt + 1} failed: {e}")
+            await asyncio.sleep(2)
+        print("[HR] Giving up on heart rate monitor connection.")
 
     async def disconnect(self):
         if self.testing:
@@ -1943,6 +2047,8 @@ class TreadmillControl:
             return
         if self.client:
             await self.client.disconnect()
+        if self.hr_client:
+            await self.hr_client.disconnect()
 
     async def request_control(self):
         if self.testing:
@@ -2013,13 +2119,13 @@ class TreadmillControl:
         await self.set_speed(self.current_speed - 0.5)
 
     async def start_or_resume(self):
-            if self.testing:
-                print("Simulated FTMS start/resume command.")
-                return
-            await self.client.write_gatt_char(control_point_uuid, bytearray([0x07]))
-            await self.wait_for_response()
+        if self.testing:
+            print("Simulated FTMS start/resume command.")
+            return
+        await self.client.write_gatt_char(control_point_uuid, bytearray([0x07]))
+        await self.wait_for_response()
 
-def parse_treadmill_data(data: bytes):
+def parse_treadmill_data(data: bytes, hr_value=None):
     flags = int.from_bytes(data[0:2], byteorder='little')
     idx = 2
 
@@ -2093,20 +2199,15 @@ def parse_treadmill_data(data: bytes):
         parsed["force_on_belt_n"] = read_sint16()
         parsed["power_output_w"] = read_sint16()
 
-    #return parsed
-
     values = (
         parsed.get("speed_kmh"),
         parsed.get("distance_km"),
         parsed.get("incline_percent"),
-        parsed.get("elapsed_time_s")
+        parsed.get("elapsed_time_s"),
+        parsed.get("heart_rate_bpm") if parsed.get("heart_rate_bpm") is not None else hr_value
     )
 
-    #print(f"[TEST MODE] Parsed treadmill data: speed={values[0]}, distance={values[1]}, incline={values[2]}, elapsed_time={values[3]}")
-
     return values
-
-    
 --- End of treadmill_control.py ---
 
 [File] treadmill_log.json
@@ -2806,7 +2907,8 @@ def get_screen_resolution():
         print("Could not determine screen resolution:", e)
         return 1280, 720
 
-async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, exit_signal):
+async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue, elapsed_time_queue, ghost_gap_queue, heart_rate_queue, exit_signal):
+
     cap = cv2.VideoCapture(video_path)
     last_known_speed = 0.0
     last_known_distance = 0.0
@@ -2834,6 +2936,11 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
             pass
 
         try:
+            last_known_hr = heart_rate_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            last_known_hr = None
+
+        try:
             last_known_speed = speed_queue.get_nowait()
         except asyncio.QueueEmpty:
             pass
@@ -2851,6 +2958,16 @@ async def play_video(video_path, speed_ratio_queue, speed_queue, distance_queue,
         # HUD: Speed
         hud_speed_text = f"{last_known_speed:.1f} km/h"
         cv2.putText(frame, hud_speed_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # HUD: Heart Rate
+        if last_known_hr is not None:
+            hr_text = f"HR: {last_known_hr} bpm"
+            (text_width, text_height), _ = cv2.getTextSize(hr_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+            x_position = (frame.shape[1] - text_width) // 2
+            y_position = 30  # Top margin
+            cv2.putText(frame, hr_text, (x_position, y_position), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 2)
+
+
 
         # HUD: Distance
         hud_distance_text = f"{last_known_distance:.2f} km"
