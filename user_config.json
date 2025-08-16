@@ -13,5 +13,6 @@
     "5": 30.0,
     "10": 60.0,
     "21": 135.0
-  }
+  },
+  "use_video_filename_speed": true
 }
